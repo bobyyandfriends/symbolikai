@@ -1,47 +1,66 @@
-# utils/time_utils.py
+#!/usr/bin/env python3
+import datetime
+from typing import Union
 
-from datetime import datetime, timedelta
-import pandas as pd
-
-def parse_timestamp(ts: str) -> pd.Timestamp:
+def to_datetime(dt: Union[str, datetime.datetime]) -> datetime.datetime:
     """
-    Convert string to pandas Timestamp.
-    Accepts formats like: "2024-01-01 13:30", "2024-01-01", etc.
+    Convert a string or datetime object to a datetime object.
+    
+    Parameters:
+      dt: A string in ISO format (or other common formats) or a datetime object.
+      
+    Returns:
+      A datetime.datetime object.
+      
+    Raises:
+      ValueError if the input string cannot be parsed.
     """
+    if isinstance(dt, datetime.datetime):
+        return dt
     try:
-        return pd.to_datetime(ts)
-    except Exception:
-        raise ValueError(f"Unrecognized timestamp format: {ts}")
+        return datetime.datetime.fromisoformat(dt)
+    except Exception as e:
+        raise ValueError(f"Unable to parse datetime from: {dt}") from e
 
+def round_datetime(dt: datetime.datetime, round_to: int = 60) -> datetime.datetime:
+    """
+    Round a datetime object to the nearest multiple of a given number of seconds.
+    
+    Parameters:
+      dt: The datetime object to round.
+      round_to: The number of seconds to round to (default is 60 seconds, i.e. nearest minute).
+      
+    Returns:
+      A new datetime object rounded to the nearest multiple of round_to seconds.
+    """
+    # Calculate seconds since midnight
+    midnight = dt.replace(hour=0, minute=0, second=0, microsecond=0)
+    seconds_since_midnight = (dt - midnight).total_seconds()
+    # Round the seconds
+    rounding = int((seconds_since_midnight + round_to / 2) // round_to * round_to)
+    return midnight + datetime.timedelta(seconds=rounding)
 
-def get_market_open_close(date: str) -> tuple[pd.Timestamp, pd.Timestamp]:
+def get_time_difference(start: datetime.datetime, end: datetime.datetime) -> float:
     """
-    Given a date string, return the market open/close timestamps for that day.
+    Calculate the difference between two datetime objects in seconds.
+    
+    Parameters:
+      start: The start datetime.
+      end: The end datetime.
+      
+    Returns:
+      The time difference in seconds as a float.
     """
-    base_date = pd.to_datetime(date)
-    open_time = base_date.replace(hour=9, minute=30)
-    close_time = base_date.replace(hour=16, minute=0)
-    return open_time, close_time
+    return (end - start).total_seconds()
 
-
-def get_next_trading_day(date: str, calendar: list[str] = None) -> str:
-    """
-    Return the next valid trading day after the given date.
-    Optionally pass a list of valid trading dates (calendar).
-    """
-    d = pd.to_datetime(date)
-    while True:
-        d += timedelta(days=1)
-        if calendar:
-            if d.strftime("%Y-%m-%d") in calendar:
-                return d.strftime("%Y-%m-%d")
-        elif d.weekday() < 5:  # Mon-Fri
-            return d.strftime("%Y-%m-%d")
-
-
-def filter_market_hours(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Filters a minute-level DataFrame to only include regular market hours (9:30 AM to 4:00 PM).
-    Assumes the index is datetime.
-    """
-    return df.between_time("09:30", "16:00")
+if __name__ == "__main__":
+    # Example usage:
+    dt_str = "2023-03-29T12:34:56"
+    dt_obj = to_datetime(dt_str)
+    print("Parsed datetime:", dt_obj)
+    
+    rounded_dt = round_datetime(dt_obj, round_to=60)
+    print("Rounded datetime (nearest minute):", rounded_dt)
+    
+    diff_seconds = get_time_difference(dt_obj, rounded_dt)
+    print("Difference in seconds:", diff_seconds)

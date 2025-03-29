@@ -1,60 +1,50 @@
-# tests/test_metrics.py
-
-import unittest
-from backtest.trade import Trade
+#!/usr/bin/env python3
+import pytest
+import pandas as pd
+from datetime import datetime
 from backtest.metrics import calculate_metrics
-from datetime import datetime, timedelta
 
-class TestMetrics(unittest.TestCase):
-
-    def setUp(self):
-        # Create sample trades
-        self.trades = [
-            Trade(
-                entry_time=datetime(2024, 1, 1),
-                exit_time=datetime(2024, 1, 3),
-                entry_price=100,
-                exit_price=110,
-                side="long",
-                capital_allocated=1000,
-                signal_strength=1.0
-            ),
-            Trade(
-                entry_time=datetime(2024, 1, 4),
-                exit_time=datetime(2024, 1, 6),
-                entry_price=200,
-                exit_price=180,
-                side="short",
-                capital_allocated=1000,
-                signal_strength=0.9
-            )
-        ]
-
-        # Apply PnL calculation
-        for trade in self.trades:
-            trade.calculate_pnl()
-
-    def test_metrics_keys(self):
-        metrics = calculate_metrics(self.trades)
-        expected_keys = {
-            "win_rate", "total_return", "max_drawdown",
-            "sharpe_ratio", "profit_factor", "avg_holding_time",
-            "exposure"
+def dummy_trades():
+    trades_data = [
+        {
+            'entry_time': datetime(2022, 1, 1),
+            'entry_price': 100,
+            'exit_time': datetime(2022, 1, 5),
+            'exit_price': 105,
+            'profit': 5
+        },
+        {
+            'entry_time': datetime(2022, 1, 10),
+            'entry_price': 106,
+            'exit_time': datetime(2022, 1, 15),
+            'exit_price': 104,
+            'profit': -2
+        },
+        {
+            'entry_time': datetime(2022, 1, 20),
+            'entry_price': 103,
+            'exit_time': datetime(2022, 1, 25),
+            'exit_price': 108,
+            'profit': 5
         }
-        self.assertTrue(expected_keys.issubset(metrics.keys()))
+    ]
+    return pd.DataFrame(trades_data)
 
-    def test_total_return_range(self):
-        metrics = calculate_metrics(self.trades)
-        self.assertTrue(-1.0 < metrics["total_return"] < 1.0)
-
-    def test_avg_holding_time_format(self):
-        metrics = calculate_metrics(self.trades)
-        self.assertIsInstance(metrics["avg_holding_time"], float)
-
-    def test_win_rate_calculation(self):
-        metrics = calculate_metrics(self.trades)
-        self.assertAlmostEqual(metrics["win_rate"], 0.5, delta=0.01)
-
+def test_calculate_metrics():
+    trades = dummy_trades()
+    initial_capital = 100000
+    metrics = calculate_metrics(trades, initial_capital)
+    
+    expected_keys = {"total_return_percent", "win_rate_percent", "avg_profit", "max_drawdown_percent", "num_trades", "avg_holding_days"}
+    assert expected_keys.issubset(set(metrics.keys()))
+    
+    total_profit = sum(trade["profit"] for trade in trades.to_dict("records"))
+    expected_total_return = (total_profit / initial_capital) * 100
+    assert metrics["total_return_percent"] == pytest.approx(expected_total_return)
+    
+    # With 2 winning trades out of 3, win rate ~66.67%
+    assert metrics["win_rate_percent"] == pytest.approx((2/3)*100, rel=0.01)
+    assert metrics["num_trades"] == 3
 
 if __name__ == "__main__":
-    unittest.main()
+    pytest.main()

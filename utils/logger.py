@@ -1,37 +1,45 @@
-# utils/logger.py
-
+#!/usr/bin/env python3
 import logging
 import os
-from datetime import datetime
 
-def setup_logger(name: str, log_dir: str = "logs") -> logging.Logger:
+def setup_logger(name: str = __name__, log_file: str = "app.log", level=logging.INFO) -> logging.Logger:
     """
-    Sets up and returns a logger that logs to both console and file.
+    Set up a logger with a specified name, output file, and logging level.
+    
+    Logs are written both to the console and to the specified log file.
+    
+    Parameters:
+      name (str): The name of the logger.
+      log_file (str): The log file path.
+      level: Logging level (e.g., logging.INFO).
+      
+    Returns:
+      logging.Logger: Configured logger instance.
     """
-    if not os.path.exists(log_dir):
-        os.makedirs(log_dir)
-
     logger = logging.getLogger(name)
-    logger.setLevel(logging.DEBUG)
-
-    # Avoid adding duplicate handlers if already configured
-    if logger.handlers:
-        return logger
-
-    # Formatter
-    formatter = logging.Formatter('%(asctime)s | %(name)s | %(levelname)s | %(message)s')
-
-    # Console Handler
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.INFO)
-    console_handler.setFormatter(formatter)
-    logger.addHandler(console_handler)
-
-    # File Handler
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    file_handler = logging.FileHandler(f"{log_dir}/{name}_{timestamp}.log")
-    file_handler.setLevel(logging.DEBUG)
+    logger.setLevel(level)
+    logger.propagate = False  # Prevent log messages from being propagated to the root logger
+    
+    formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    
+    # Create file handler
+    file_handler = logging.FileHandler(log_file)
     file_handler.setFormatter(formatter)
-    logger.addHandler(file_handler)
-
+    file_handler.setLevel(level)
+    
+    # Create console handler
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(formatter)
+    console_handler.setLevel(level)
+    
+    if not logger.handlers:
+        logger.addHandler(file_handler)
+        logger.addHandler(console_handler)
+    
     return logger
+
+if __name__ == "__main__":
+    logger = setup_logger("test_logger", "test_app.log")
+    logger.info("This is an info message.")
+    logger.debug("This is a debug message.")
+    logger.error("This is an error message.")

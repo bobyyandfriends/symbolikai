@@ -1,65 +1,69 @@
-# tests/test_backtester.py
-
-import unittest
+#!/usr/bin/env python3
+import pytest
 import pandas as pd
+import numpy as np
+from datetime import datetime
 from backtest.backtester import run_backtest
-from backtest.trade import Trade
-from strategies.demark_perfection_strategy import PerfectionStrategy
-from data.data_store import save_df_csv, load_df_csv
+from strategies.simple_strategy import SimpleStrategy
 
-class TestBacktester(unittest.TestCase):
+@pytest.fixture
+def dummy_price_data():
+    """
+    Create dummy historical price data with necessary columns.
+    """
+    dates = pd.date_range(start="2022-01-01", periods=50, freq='D')
+    np.random.seed(42)
+    prices = np.cumsum(np.random.randn(50)) + 100
+    data = pd.DataFrame({
+        'datetime': dates,
+        'open': prices + np.random.randn(50) * 0.5,
+        'high': prices + np.random.rand(50),
+        'low': prices - np.random.rand(50),
+        'close': prices,
+        'volume': np.random.randint(100, 1000, size=50)
+    })
+    return data
 
-    def setUp(self):
-        # Create a mock DataFrame of price data
-        self.price_data = pd.DataFrame({
-            "datetime": pd.date_range(start="2024-01-01", periods=10, freq="D"),
-            "open": [100 + i for i in range(10)],
-            "high": [101 + i for i in range(10)],
-            "low": [99 + i for i in range(10)],
-            "close": [100 + i for i in range(10)],
-            "volume": [1000] * 10,
-        }).set_index("datetime")
+@pytest.fixture
+def dummy_strategy():
+    """
+    Provide an instance of SimpleStrategy.
+    """
+    from strategies.simple_strategy import SimpleStrategy
+    return SimpleStrategy()
 
-        # Create matching signals
-        self.signal_data = pd.DataFrame({
-            "symbol": ["AAPL"] * 2,
-            "signal": ["Perfection9Up", "Perfection9Up"],
-            "exchange": ["Cboe-BZX"] * 2,
-            "timeframe": ["Daily"] * 2,
-            "datetime": [self.price_data.index[2], self.price_data.index[5]]
-        })
+@pytest.fixture
+def dummy_signals(dummy_price_data, dummy_strategy):
+    """
+    Generate dummy signals using the dummy strategy.
+    """
+    return dummy_strategy.generate_signals(dummy_price_data)
 
-        # Use a real strategy with simple logic
-        self.strategy = PerfectionStrategy()
-
-        self.config = {
-            "initial_capital": 10000,
-            "slippage_pct": 0.001,
-            "side": "long"
-        }
-
-    def test_backtest_runs(self):
-        results = run_backtest(self.strategy, self.price_data, self.signal_data, self.config)
-
-        self.assertIn("trades", results)
-        self.assertIn("metrics", results)
-        self.assertIsInstance(results["trades"], list)
-        self.assertIsInstance(results["metrics"], dict)
-
-    def test_trade_output_format(self):
-        results = run_backtest(self.strategy, self.price_data, self.signal_data, self.config)
-        if results["trades"]:
-            trade = results["trades"][0]
-            self.assertTrue(hasattr(trade, "entry_time"))
-            self.assertTrue(hasattr(trade, "exit_time"))
-            self.assertTrue(hasattr(trade, "calculate_pnl"))
-
-    def test_metrics_format(self):
-        results = run_backtest(self.strategy, self.price_data, self.signal_data, self.config)
-        metrics = results["metrics"]
-        expected_keys = {"win_rate", "total_return", "max_drawdown", "sharpe_ratio"}
-        self.assertTrue(expected_keys.issubset(metrics.keys()))
-
+def test_run_backtest(dummy_price_data, dummy_strategy, dummy_signals):
+    """
+    Test run_backtest returns a valid results dictionary.
+    """
+    config = {"initial_capital": 100000}
+    results = run_backtest(dummy_strategy, dummy_price_data, dummy_signals, config)
+    
+    # Check that results is a dictionary with expected keys.
+    expected_keys = {"trades", "metrics", "config", "strategy_name", "timestamp"}
+    assert expected_keys.issubset(results.keys())
+    
+    # Check that trades is a DataFrame with expected columns, if not empty.
+    trades = results["trades"]
+    assert isinstance(trades, pd.DataFrame)
+    if not trades.empty:
+        expected_trade_columns = {"entry_time", "entry_price", "exit_time", "exit_price", "profit"}
+        assert expected_trade_columns.issubset(set(trades.columns))
+    
+    # Check that metrics is a dictionary with key performance indicators.
+    metrics = results["metrics"]
+    expected_metric_keys = {"total_return", "win_rate", "avg_profit", "max_drawdown", "num_trades"}
+    assert expected_metric_keys.issubset(set(metrics.keys()))
+    
+    # Verify strategy name matches the dummy strategy.
+    assert results["strategy_name"] == dummy_strategy.name
 
 if __name__ == "__main__":
-    unittest.main()
+    pytest.main()

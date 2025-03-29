@@ -1,58 +1,100 @@
-# reporting/equity_curve.py
-
-import matplotlib.pyplot as plt
-from backtest.trade import Trade
+#!/usr/bin/env python3
 import pandas as pd
 
-def plot_equity_curve(trades: list[Trade]):
+def generate_trade_log(trades: pd.DataFrame) -> pd.DataFrame:
     """
-    Plots cumulative equity over time.
+    Generate a detailed trade log by adding calculated fields such as holding period (in days).
+    Expects the trades DataFrame to contain:
+      - 'entry_time'
+      - 'exit_time'
+      - 'entry_price'
+      - 'exit_price'
+      - 'profit'
+    
+    Returns:
+      A new DataFrame with an added 'holding_period' column.
     """
-    if not trades:
-        print("No trades to plot.")
-        return
+    trade_log = trades.copy()
+    # Ensure that entry_time and exit_time are datetime objects
+    trade_log['entry_time'] = pd.to_datetime(trade_log['entry_time'])
+    trade_log['exit_time'] = pd.to_datetime(trade_log['exit_time'])
+    # Calculate holding period in days
+    trade_log['holding_period'] = (trade_log['exit_time'] - trade_log['entry_time']).dt.total_seconds() / (24 * 3600)
+    return trade_log
 
-    dates = [t.exit_time for t in trades]
-    equity = [1.0]  # Starting equity baseline
-
-    for t in trades:
-        pnl = t.calculate_pnl()
-        equity.append(equity[-1] + pnl)
-
-    plt.figure(figsize=(12, 4))
-    plt.plot(dates, equity[1:], label="Equity Curve", color="blue")
-    plt.title("Equity Curve")
-    plt.xlabel("Date")
-    plt.ylabel("Equity")
-    plt.grid(True)
-    plt.tight_layout()
-    plt.show()
-
-
-def plot_drawdowns(trades: list[Trade]):
+def export_trades_to_csv(trades: pd.DataFrame, path: str):
     """
-    Plots drawdowns from peak equity.
+    Export the generated trade log to a CSV file.
     """
-    if not trades:
-        print("No trades to plot.")
-        return
+    trade_log = generate_trade_log(trades)
+    trade_log.to_csv(path, index=False)
+    print(f"Trade log exported to: {path}")
 
-    dates = [t.exit_time for t in trades]
-    equity = [1.0]
+def print_performance_summary(metrics: dict):
+    """
+    Nicely print the performance summary based on the provided metrics dictionary.
+    """
+    print("Performance Summary:")
+    for key, value in metrics.items():
+        print(f"  {key.replace('_', ' ').title()}: {value}")
 
-    for t in trades:
-        pnl = t.calculate_pnl()
-        equity.append(equity[-1] + pnl)
+def export_summary_to_txt(metrics: dict, path: str):
+    """
+    Export the performance summary to a text file.
+    """
+    lines = ["Performance Summary:"]
+    for key, value in metrics.items():
+        lines.append(f"{key.replace('_', ' ').title()}: {value}")
+    summary_text = "\n".join(lines)
+    with open(path, "w") as f:
+        f.write(summary_text)
+    print(f"Performance summary exported to: {path}")
 
-    equity_series = pd.Series(equity[1:], index=dates)
-    running_max = equity_series.cummax()
-    drawdowns = equity_series - running_max
+if __name__ == "__main__":
+    # Example usage:
+    from datetime import datetime
 
-    plt.figure(figsize=(12, 4))
-    plt.plot(drawdowns.index, drawdowns.values, label="Drawdown", color="red")
-    plt.title("Max Drawdowns Over Time")
-    plt.xlabel("Date")
-    plt.ylabel("Drawdown")
-    plt.grid(True)
-    plt.tight_layout()
-    plt.show()
+    trades_data = [
+        {
+            'entry_time': datetime(2022, 1, 1),
+            'exit_time': datetime(2022, 1, 5),
+            'entry_price': 100,
+            'exit_price': 105,
+            'profit': 5
+        },
+        {
+            'entry_time': datetime(2022, 1, 10),
+            'exit_time': datetime(2022, 1, 15),
+            'entry_price': 106,
+            'exit_price': 104,
+            'profit': -2
+        },
+        {
+            'entry_time': datetime(2022, 1, 20),
+            'exit_time': datetime(2022, 1, 25),
+            'entry_price': 103,
+            'exit_price': 108,
+            'profit': 5
+        }
+    ]
+    trades_df = pd.DataFrame(trades_data)
+    trade_log = generate_trade_log(trades_df)
+    print("Trade Log:")
+    print(trade_log)
+    
+    # Example metrics dictionary
+    metrics = {
+        'total_return_percent': 8.0,
+        'win_rate_percent': 66.67,
+        'avg_profit': 2.67,
+        'max_drawdown_percent': 5.0,
+        'num_trades': 3,
+        'avg_holding_days': trade_log['holding_period'].mean()
+    }
+    
+    print("\n")
+    print_performance_summary(metrics)
+    
+    # Optionally, export trades and summary to files
+    export_trades_to_csv(trades_df, "trade_log.csv")
+    export_summary_to_txt(metrics, "performance_summary.txt")

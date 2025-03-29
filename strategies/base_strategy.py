@@ -1,47 +1,54 @@
-# strategies/base_strategy.py
-
-import pandas as pd
+#!/usr/bin/env python3
 from abc import ABC, abstractmethod
-from typing import List, Dict
+import pandas as pd
 
 class Strategy(ABC):
-    def __init__(self, config: Dict = None):
-        self.config = config or {}
-        self.indicators_enabled = True
+    """
+    Abstract base class for all trading strategies.
+    Custom strategies must implement the methods defined below.
+    """
+
+    def __init__(self, name: str = "BaseStrategy", **kwargs):
+        """
+        Initialize the strategy with a name and optional parameters.
+        """
+        self.name = name
+        self.params = kwargs
 
     @abstractmethod
     def generate_signals(self, price_data: pd.DataFrame, signal_data: pd.DataFrame) -> pd.DataFrame:
         """
-        Must return a DataFrame with 'entry' and 'exit' signals as boolean columns.
+        Analyze price and signal data to generate entry and exit signals.
+        Should return a DataFrame containing at least a 'timestamp' column and a 'signal' column.
         """
         pass
 
+    @abstractmethod
     def apply_indicators(self, price_data: pd.DataFrame) -> pd.DataFrame:
         """
-        Optional: Override to apply technical indicators like RSI, Momentum, etc.
+        Compute technical indicators (e.g. RSI, EMA, etc.) on the price data.
+        Returns a DataFrame with additional indicator columns.
         """
-        return price_data
+        pass
 
-    def generate_trades(self, df: pd.DataFrame) -> pd.DataFrame:
+    @abstractmethod
+    def generate_trades(self, price_data: pd.DataFrame, signals: pd.DataFrame) -> pd.DataFrame:
         """
-        Uses signal columns ('entry' and 'exit') to generate a trade list.
-        Can be extended or customized by subclasses.
+        Convert the generated signals into a trade log.
+        Should return a DataFrame that includes trade details such as entry time, exit time, prices, etc.
         """
-        df = df.copy()
-        df["position"] = 0  # 1 = long, -1 = short
+        pass
 
-        in_trade = False
-        for i in range(len(df)):
-            if not in_trade and df.at[i, "entry"]:
-                df.at[i, "position"] = 1
-                in_trade = True
-            elif in_trade and df.at[i, "exit"]:
-                df.at[i, "position"] = 0
-                in_trade = False
-            else:
-                df.at[i, "position"] = df.at[i-1, "position"] if i > 0 else 0
+    def __str__(self):
+        return f"{self.name} Strategy with parameters: {self.params}"
 
-        return df
 
-    def get_name(self):
-        return self.__class__.__name__
+# The following test code is optional.
+# It lets you run this file as a script to verify that it can be imported without errors.
+if __name__ == "__main__":
+    # Since Strategy is abstract, attempting to instantiate it directly will raise an error.
+    # This block is only for demonstration purposes.
+    try:
+        s = Strategy()
+    except TypeError as e:
+        print("Cannot instantiate abstract class Strategy:", e)

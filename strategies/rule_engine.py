@@ -1,44 +1,79 @@
-# strategies/rule_engine.py
-
+#!/usr/bin/env python3
 import pandas as pd
 import operator
 
-# Supported operators
-OPS = {
-    "<": operator.lt,
-    "<=": operator.le,
-    ">": operator.gt,
-    ">=": operator.ge,
-    "==": operator.eq,
-    "!=": operator.ne
+OPERATORS = {
+    '<': operator.lt,
+    '<=': operator.le,
+    '>': operator.gt,
+    '>=': operator.ge,
+    '==': operator.eq,
+    '!=': operator.ne
 }
 
-def evaluate_condition(df: pd.DataFrame, condition: dict) -> pd.Series:
+def evaluate_rule(df: pd.DataFrame, rule: dict) -> pd.Series:
     """
-    Evaluates a single rule like:
-    {"col": "RSI", "op": "<", "val": 30}
+    Evaluate a rule on the DataFrame and return a boolean Series.
+    
+    Rule format example:
+    {
+      "conditions": [
+         {"column": "rsi", "operator": "<", "value": 30},
+         {"column": "close", "operator": ">", "value": "sma"}  # value can be a constant or another column name
+      ],
+      "combine": "and"   # or "or"
+    }
     """
-    col, op, val = condition["col"], condition["op"], condition["val"]
-
-    if col not in df.columns:
-        raise KeyError(f"Missing column: {col}")
-
-    return OPS[op](df[col], val)
-
-
-def evaluate_rule(df: pd.DataFrame, rule: list) -> pd.Series:
-    """
-    Combines multiple conditions using AND logic.
-
-    Example rule:
-    [
-        {"col": "RSI", "op": "<", "val": 40},
-        {"col": "signal_type", "op": "==", "val": "Perfection9Up"}
-    ]
-    """
-    result = pd.Series(True, index=df.index)
-
-    for cond in rule:
-        result &= evaluate_condition(df, cond)
-
+    conditions = rule.get("conditions", [])
+    combine_op = rule.get("combine", "and").lower()
+    
+    if not conditions:
+        raise ValueError("Rule must contain at least one condition.")
+    
+    result = None
+    for cond in conditions:
+        col = cond.get("column")
+        op_str = cond.get("operator")
+        val = cond.get("value")
+        if op_str not in OPERATORS:
+            raise ValueError(f"Unsupported operator: {op_str}")
+        op_func = OPERATORS[op_str]
+        # If value is numeric, use it directly; if string, assume it's a column reference.
+        if isinstance(val, (int, float)):
+            series = op_func(df[col], val)
+        elif isinstance(val, str):
+            series = op_func(df[col], df[val])
+        else:
+            raise ValueError("Condition value must be int, float, or str.")
+        
+        if result is None:
+            result = series
+        else:
+            if combine_op == "and":
+                result = result & series
+            elif combine_op == "or":
+                result = result | series
+            else:
+                raise ValueError("Combine operator must be 'and' or 'or'.")
     return result
+
+if __name__ == "__main__":
+    # Example usage:
+    import numpy as np
+    df = pd.DataFrame({
+        'rsi': np.random.randint(20, 80, size=10),
+        'close': np.linspace(100, 110, 10),
+        'sma': np.linspace(101, 111, 10)
+    })
+    rule = {
+        "conditions": [
+            {"column": "rsi", "operator": "<", "value": 40},
+            {"column": "close", "operator": ">", "value": "sma"}
+        ],
+        "combine": "and"
+    }
+    condition_met = evaluate_rule(df, rule)
+    print("DataFrame:")
+    print(df)
+    print("Rule condition met:")
+    print(condition_met)

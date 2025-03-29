@@ -1,52 +1,75 @@
-# ui/pages/model_trainer.py
-
+#!/usr/bin/env python3
 import streamlit as st
-from ml.model_training import train_model_for_strategy
-from ml.model_inference import evaluate_model_performance
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from datetime import datetime
+import pandas_ta as ta
+
+# Import functions from our ML module
+from ml.model_training import generate_features, train_model
 import joblib
-import os
 
-MODEL_DIR = "models"
+def main():
+    st.title("Model Trainer")
+    st.write("Upload historical price data (CSV) to train an ML model.")
+    
+    price_file = st.file_uploader("Upload Price Data (CSV)", type=["csv"])
+    
+    if price_file is not None:
+        try:
+            # Expect a CSV with at least a 'datetime' and 'close' column
+            price_data = pd.read_csv(price_file, parse_dates=["datetime"])
+            st.success("Price data loaded successfully.")
+            st.write("Price Data Preview:")
+            st.dataframe(price_data.head())
+        except Exception as e:
+            st.error(f"Error loading price data: {e}")
+            return
+    else:
+        st.info("Please upload price data to proceed.")
+        return
 
-def display():
-    st.title("🤖 Train Strategy Models")
+    # Sidebar for training parameters
+    st.sidebar.header("Training Parameters")
+    future_window = st.sidebar.slider("Future window (bars)", 5, 20, 10)
+    profit_threshold = st.sidebar.number_input("Profit threshold (%)", min_value=0.0, value=3.0, step=0.1) / 100.0
+    loss_threshold = st.sidebar.number_input("Loss threshold (%)", min_value=-10.0, value=-2.0, step=0.1) / 100.0
 
-    strategy_name = st.selectbox("Select Strategy to Train", ["Perfection9Up", "Combo_C13_P9", "S13Variant"])
-    model_type = st.selectbox("Model Type", ["xgboost", "random_forest", "lightgbm"])
-
+    # Check if essential technical indicators are present; if not, compute them
+    if "rsi" not in price_data.columns or "sma" not in price_data.columns:
+        st.info("Computing default technical indicators (RSI and SMA) for feature generation...")
+        price_data["rsi"] = ta.rsi(price_data["close"], length=14)
+        price_data["sma"] = price_data["close"].rolling(window=10, min_periods=10).mean()
+        price_data = price_data.dropna().reset_index(drop=True)
+    
+    # Create a dummy signals DataFrame for feature generation (for simplicity, mark all rows as 'buy')
+    signals = pd.DataFrame({
+        "datetime": price_data["datetime"],
+        "signal": ["buy"] * len(price_data)
+    })
+    
     if st.button("Train Model"):
-        st.write(f"Training model for `{strategy_name}` using `{model_type}`...")
-        model, metrics, commentary = train_model_for_strategy(strategy_name, model_type)
+        st.subheader("Generating Features")
+        # Generate features and target using our ML module
+        features_df = generate_features(price_data, signals)
+        st.write("Sample of Generated Features:")
+        st.dataframe(features_df.head())
+        
+        st.info("Training model, please wait...")
+        # Train the model (RandomForestClassifier in our example)
+        model = train_model(features_df)
+        
+        st.success("Model trained successfully!")
+        
+        # Display sample predictions
+        X_sample = features_df.drop(columns=["target"])
+        predictions = model.predict(X_sample)
+        features_df["prediction"] = predictions
+        st.write("Sample Predictions:")
+        st.dataframe(features_df.head())
+        
+        st.info("Trained model saved as 'trained_model.pkl'.")
 
-        st.success("✅ Training Complete")
-        st.write("📈 Evaluation Metrics:")
-        st.json(metrics)
-
-        st.write("🧠 Model Commentary:")
-        st.text(commentary)
-
-        # Save model
-        if not os.path.exists(MODEL_DIR):
-            os.makedirs(MODEL_DIR)
-        model_path = os.path.join(MODEL_DIR, f"{strategy_name}_{model_type}.pkl")
-        joblib.dump(model, model_path)
-        st.info(f"Model saved to `{model_path}`")
-
-    st.markdown("---")
-
-    if st.checkbox("Evaluate Existing Model"):
-        strategy_name = st.text_input("Strategy Name", "Perfection9Up")
-        model_type = st.text_input("Model Type", "xgboost")
-
-        model_path = os.path.join(MODEL_DIR, f"{strategy_name}_{model_type}.pkl")
-        if os.path.exists(model_path):
-            st.success(f"Found saved model at `{model_path}`")
-            model = joblib.load(model_path)
-            eval_metrics, notes = evaluate_model_performance(model)
-            st.write("📊 Evaluation Results:")
-            st.json(eval_metrics)
-            st.write("🔎 Observations:")
-            st.text(notes)
-        else:
-            st.error("Model not found.")
-
+if __name__ == "__main__":
+    main()

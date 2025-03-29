@@ -1,65 +1,96 @@
+import os
 import pandas as pd
+
+def load_signals_from_file(path: str) -> pd.DataFrame:
+    """
+    Load raw signals from an Excel or CSV file.
+    The function detects the file extension and uses the appropriate pandas function.
+    """
+    ext = os.path.splitext(path)[1].lower()
+    if ext == '.csv':
+        df = pd.read_csv(path)
+    elif ext in ['.xls', '.xlsx']:
+        df = pd.read_excel(path)
+    else:
+        raise ValueError(f"Unsupported file extension for signals data: {ext}")
+    return df
 
 def normalize_signals(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Standardize signal formatting:
-    - Rename columns
-    - Format datetime
-    - Clean text
+    Normalize the signals DataFrame:
+    • Converts column names to lowercase and trims whitespace.
+    • Renames common columns (e.g., 'date' to 'timestamp').
+    • Parses timestamps to datetime objects.
+    • Standardizes the symbol (upper-case) and signal (lower-case) columns.
     """
     df = df.copy()
+    df.columns = [col.strip().lower() for col in df.columns]
 
-    # Rename columns to standard format if needed
-    rename_map = {
-        "Date": "datetime",
-        "Signal1": "signal_group",
-        "Signal2": "signal_type",
-        "Symbol": "symbol",
-        "Exchange": "exchange",
-        "Timeframe": "timeframe"
-    }
-    df.rename(columns=rename_map, inplace=True)
+    # Rename 'date' to 'timestamp' if needed
+    if 'date' in df.columns and 'timestamp' not in df.columns:
+        df.rename(columns={'date': 'timestamp'}, inplace=True)
 
-    # Parse datetime with flexibility
-    df["datetime"] = pd.to_datetime(df["datetime"], errors="coerce")
-    df = df.dropna(subset=["datetime"])
+    # Parse timestamp column
+    if 'timestamp' in df.columns:
+        df['timestamp'] = pd.to_datetime(df['timestamp'])
+    else:
+        raise KeyError("The signals data must have a 'timestamp' or 'date' column.")
 
-    # Strip strings & uppercase symbols
-    df["symbol"] = df["symbol"].str.upper().str.strip()
-    df["signal_type"] = df["signal_type"].str.strip()
-    df["signal_group"] = df["signal_group"].str.strip()
-    df["exchange"] = df["exchange"].str.strip()
-    df["timeframe"] = df["timeframe"].str.lower().str.strip()
+    # Standardize symbol column
+    if 'symbol' in df.columns:
+        df['symbol'] = df['symbol'].astype(str).str.strip().str.upper()
+    else:
+        raise KeyError("The signals data must have a 'symbol' column.")
 
-    # Sort and reset
-    df = df.sort_values(["symbol", "datetime"]).reset_index(drop=True)
+    # Standardize signal column
+    if 'signal' in df.columns:
+        df['signal'] = df['signal'].astype(str).str.strip().str.lower()
+
     return df
-
 
 def deduplicate_signals(existing_df: pd.DataFrame, new_df: pd.DataFrame) -> pd.DataFrame:
     """
-    Removes duplicates based on: symbol, datetime, signal_type, and timeframe.
+    Combine the existing and new signal data while removing duplicates.
+    Duplicates are defined based on 'symbol', 'signal', and 'timestamp'.
     """
     combined = pd.concat([existing_df, new_df], ignore_index=True)
-
-    deduped = combined.drop_duplicates(
-        subset=["symbol", "datetime", "signal_type", "timeframe"]
-    ).sort_values(["symbol", "datetime"])
-
-    return deduped.reset_index(drop=True)
-
+    deduped = combined.drop_duplicates(subset=['symbol', 'signal', 'timestamp'])
+    deduped.reset_index(drop=True, inplace=True)
+    return deduped
 
 def save_master_signals(df: pd.DataFrame, path: str):
     """
-    Save the combined master signal file to disk.
+    Save the master signals DataFrame to a CSV file.
     """
-    save_df_csv(df, path)
+    df.to_csv(path, index=False)
 
-def load_master_signals(path: str) -> pd.DataFrame:
-    """
-    Load existing saved signals, if file exists.
-    """
-    if os.path.exists(path):
-        return load_df_csv(path)
+if __name__ == "__main__":
+    # Example usage
+    base_dir = os.path.dirname(__file__)
+    new_signals_path = os.path.join(base_dir, "new_signals.csv")
+    master_signals_path = os.path.join(base_dir, "master_signals.csv")
+
+    try:
+        new_df = load_signals_from_file(new_signals_path)
+        new_df = normalize_signals(new_df)
+        print("New signals loaded and normalized:")
+        print(new_df.head())
+    except Exception as e:
+        print(f"Error loading new signals: {e}")
+        new_df = pd.DataFrame()
+
+    # Load existing master signals if available
+    if os.path.exists(master_signals_path):
+        master_df = pd.read_csv(master_signals_path, parse_dates=['timestamp'])
+        master_df = normalize_signals(master_df)
     else:
-        return pd.DataFrame(columns=["symbol", "signal_group", "signal_type", "exchange", "timeframe", "datetime"])
+        master_df = pd.DataFrame(columns=new_df.columns)
+
+    # Deduplicate and combine
+    combined_df = deduplicate_signals(master_df, new_df)
+    print("Combined master signals (deduplicated):")
+    print(combined_df.head())
+
+    # Save the updated master signals
+    save_master_signals(combined_df, master_signals_path)
+    print(f"Master signals saved to: {master_signals_path}")

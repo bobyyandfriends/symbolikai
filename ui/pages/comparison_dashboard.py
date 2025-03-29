@@ -1,44 +1,61 @@
-# ui/pages/comparison_dashboard.py
-
+#!/usr/bin/env python3
 import streamlit as st
 import pandas as pd
-import plotly.graph_objects as go
+import matplotlib.pyplot as plt
+from datetime import datetime
 
+# Import required functions and classes from your modules
+from strategies.strategy_loader import load_strategy
+from data.pricing_loader import load_price_data
+from backtest.backtester import run_backtest
 from reporting.comparison_dashboard import compare_equity_curves, compare_metrics
 
-def load_saved_results():
-    # Placeholder: Replace this with real loading logic
-    st.info("Loading example saved runs...")
-    return [
-        {
-            "strategy_name": "P9_Only",
-            "metrics": {
-                "Sharpe Ratio": 1.8,
-                "Win Rate": 0.62,
-                "Total Return": 0.25
-            },
-            "equity_curve": pd.Series([100, 105, 110, 112, 115], name="P9_Only")
-        },
-        {
-            "strategy_name": "Combo_C13_P9",
-            "metrics": {
-                "Sharpe Ratio": 2.1,
-                "Win Rate": 0.68,
-                "Total Return": 0.31
-            },
-            "equity_curve": pd.Series([100, 108, 115, 120, 130], name="Combo_C13_P9")
-        }
-    ]
+def comparison_dashboard_page():
+    st.title("Comparison Dashboard")
+    st.write("Compare multiple strategy backtests side by side using the same historical price data.")
+    
+    st.sidebar.header("Backtest Configuration")
+    price_file = st.sidebar.file_uploader("Upload Price Data (CSV)", type=["csv"])
+    
+    if price_file is not None:
+        try:
+            price_data = pd.read_csv(price_file, parse_dates=["datetime"])
+            st.success("Price data loaded successfully.")
+            st.write("### Price Data Preview")
+            st.dataframe(price_data.head())
+        except Exception as e:
+            st.error(f"Error loading price data: {e}")
+            st.stop()
+    else:
+        st.info("Please upload price data to proceed.")
+        st.stop()
+    
+    available_strategies = ["SimpleStrategy", "DemarkPerfectionStrategy", "ComboStrategyExample"]
+    selected_strategies = st.sidebar.multiselect("Select Strategies to Compare", available_strategies, default=available_strategies)
+    
+    initial_capital = st.sidebar.number_input("Initial Capital", min_value=10000, value=100000, step=10000)
+    
+    if st.button("Run Comparison Backtests"):
+        results_list = []
+        for strat_name in selected_strategies:
+            strategy = load_strategy(strat_name)
+            # Generate signals using the strategy's logic
+            signals = strategy.generate_signals(price_data)
+            config = {"initial_capital": initial_capital}
+            results = run_backtest(strategy, price_data, signals, config)
+            results_list.append(results)
+        
+        if results_list:
+            st.subheader("Equity Curves Comparison")
+            # compare_equity_curves should plot and return a figure; here we capture that figure.
+            fig_eq = compare_equity_curves(results_list)
+            st.pyplot(fig_eq)
+            
+            st.subheader("Performance Metrics Comparison")
+            metrics_df = compare_metrics(results_list)
+            st.dataframe(metrics_df)
+        else:
+            st.error("No backtest results to compare.")
 
-def display():
-    st.title("📊 Strategy Comparison Dashboard")
-
-    results = load_saved_results()
-
-    equity_df = pd.concat([res["equity_curve"] for res in results], axis=1)
-    compare_equity_curves(equity_df)
-
-    st.markdown("---")
-
-    metrics_df = pd.DataFrame([res["metrics"] for res in results], index=[res["strategy_name"] for res in results])
-    compare_metrics(metrics_df)
+if __name__ == "__main__":
+    comparison_dashboard_page()

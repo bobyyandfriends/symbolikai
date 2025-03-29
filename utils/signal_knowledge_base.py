@@ -1,45 +1,91 @@
-# utils/signal_knowledge_base.py
-
+#!/usr/bin/env python3
 import os
 import yaml
 
-SIGNAL_DOCS_PATH = "signal_docs/"
-
-def get_signal_notes(signal_name: str) -> str:
+def load_signal_metadata(signal_name: str, docs_dir: str = "signal_docs") -> dict:
     """
-    Load human-readable markdown notes for a given signal.
-    """
-    path = os.path.join(SIGNAL_DOCS_PATH, f"{signal_name}.md")
-    if not os.path.exists(path):
-        return f"No documentation found for signal: {signal_name}"
+    Load the metadata for a given signal from its YAML file.
+    The YAML file should be named '<signal_name>.yaml' and be located in the docs_dir.
     
-    with open(path, "r", encoding="utf-8") as f:
-        return f.read()
-
-
-def load_signal_metadata(signal_name: str) -> dict:
+    Parameters:
+      signal_name: The canonical name of the signal (e.g., "C13Up").
+      docs_dir: Directory where signal documentation files are stored.
+      
+    Returns:
+      A dictionary with the signal metadata.
+      
+    Raises:
+      FileNotFoundError if the file does not exist.
     """
-    Load machine-readable metadata (.yaml) for a given signal.
+    filename = os.path.join(docs_dir, f"{signal_name}.yaml")
+    if not os.path.exists(filename):
+        raise FileNotFoundError(f"Signal metadata file not found: {filename}")
+    with open(filename, "r", encoding="utf-8") as f:
+        metadata = yaml.safe_load(f)
+    return metadata
+
+def get_signal_notes(signal_name: str, docs_dir: str = "signal_docs") -> str:
     """
-    path = os.path.join(SIGNAL_DOCS_PATH, f"{signal_name}.yaml")
-    if not os.path.exists(path):
-        return {}
+    Load the human-readable notes for a given signal from its Markdown file.
+    The file should be named '<signal_name>.md' and be located in the docs_dir.
     
-    with open(path, "r", encoding="utf-8") as f:
-        return yaml.safe_load(f)
-
-
-def get_entry_conditions(signal_name: str):
+    Parameters:
+      signal_name: The canonical name of the signal (e.g., "C13Up").
+      docs_dir: Directory where signal documentation files are stored.
+      
+    Returns:
+      A string containing the notes for the signal.
+      
+    Raises:
+      FileNotFoundError if the file does not exist.
     """
-    Return list of known entry conditions from signal metadata.
+    filename = os.path.join(docs_dir, f"{signal_name}.md")
+    if not os.path.exists(filename):
+        raise FileNotFoundError(f"Signal notes file not found: {filename}")
+    with open(filename, "r", encoding="utf-8") as f:
+        notes = f.read()
+    return notes
+
+def get_entry_conditions(signal_name: str, docs_dir: str = "signal_docs") -> list:
     """
-    metadata = load_signal_metadata(signal_name)
+    Extract the entry conditions for a given signal from its metadata.
+    
+    Parameters:
+      signal_name: The canonical name of the signal.
+      docs_dir: Directory where the YAML metadata is stored.
+      
+    Returns:
+      A list of entry conditions, or an empty list if none are defined.
+    """
+    metadata = load_signal_metadata(signal_name, docs_dir)
     return metadata.get("entry_conditions", [])
 
-
-def get_failure_reasons(signal_name: str):
+def get_failure_reasons(signal_name: str, docs_dir: str = "signal_docs") -> list:
     """
-    Return known failure scenarios from signal metadata.
+    Extract the failure reasons for a given signal from its metadata.
+    
+    Parameters:
+      signal_name: The canonical name of the signal.
+      docs_dir: Directory where the YAML metadata is stored.
+      
+    Returns:
+      A list of failure reasons, or an empty list if none are defined.
     """
-    metadata = load_signal_metadata(signal_name)
+    metadata = load_signal_metadata(signal_name, docs_dir)
     return metadata.get("failures", [])
+
+if __name__ == "__main__":
+    # Example usage:
+    signal_name = "C13Up"  # Change this to a valid signal name from your signal_docs folder.
+    try:
+        notes = get_signal_notes(signal_name)
+        metadata = load_signal_metadata(signal_name)
+        entry_conditions = get_entry_conditions(signal_name)
+        failure_reasons = get_failure_reasons(signal_name)
+        
+        print(f"Notes for {signal_name}:\n{notes}\n")
+        print(f"Metadata for {signal_name}:\n{metadata}\n")
+        print(f"Entry Conditions for {signal_name}:\n{entry_conditions}\n")
+        print(f"Failure Reasons for {signal_name}:\n{failure_reasons}\n")
+    except Exception as e:
+        print(e)

@@ -1,25 +1,25 @@
 #!/usr/bin/env python3
-import os
 import yaml
+import os
 
-def load_config(config_path: str = "config.yaml") -> dict:
+def load_config(config_file: str = "config.yaml") -> dict:
     """
     Load configuration settings from a YAML file.
-
+    
     Parameters:
-      config_path (str): Path to the configuration file.
-
+      config_file (str): Path to the configuration file.
+      
     Returns:
       dict: Configuration dictionary.
-
+      
     Raises:
       FileNotFoundError: If the configuration file is not found.
       yaml.YAMLError: If there is an error parsing the YAML file.
     """
-    if not os.path.exists(config_path):
-        raise FileNotFoundError(f"Configuration file not found: {config_path}")
+    if not os.path.exists(config_file):
+        raise FileNotFoundError(f"Configuration file not found: {config_file}")
     
-    with open(config_path, "r", encoding="utf-8") as f:
+    with open(config_file, "r", encoding="utf-8") as f:
         config = yaml.safe_load(f)
     
     return config
