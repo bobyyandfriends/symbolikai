@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 import os
 import pandas as pd
-from data.collect_minute_data import update_symbol_data
-from data.data_store import load_df_csv, save_df_csv
+from collect_minute_data import update_symbol_data
+from data_store import load_df_csv, save_df_csv
 
 def update_all_symbols(universe_file: str, data_dir: str):
     """
