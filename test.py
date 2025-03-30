@@ -15,7 +15,8 @@ SLEEP_BETWEEN_CALLS = 12       # Respect 5 calls/minute limit
 
 # === YOUR SYMBOL LIST ===
 SYMBOLS = [
-    "ORCL", "PKX", "SYNA", "TDC",
+    "ACNT", "APD", "ARM", "ASML", "ASX", "BE", "CGNT", "CSCO", "DLR", "EQIX", "ETN", "FN", "FORM",
+    "FROG", "HPQ", "IRM", "JNPR", "MRVL", "MU", "NEM", "NNE", "NTAP", "ORCL", "PKX", "SYNA", "TDC",
     "TER", "VRT", "WDC", "AMAT", "AMKR", "AMZN", "ANET", "AVGO", "GOOG", "IBM", "INTC", "LRCX",
     "MSFT", "NOW", "NVDA", "PATH", "PDFS", "SKYT", "TSEM", "REE", "META", "PX", "AAPL", "DELL",
     "SMCI", "APH", "HPE", "KEYS", "PSTG", "CLS", "GLW", "JBL", "TSLA", "PLTR", "UBER", "CAMT",
