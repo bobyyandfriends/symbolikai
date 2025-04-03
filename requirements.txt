@@ -7,7 +7,7 @@ matplotlib
 seaborn
 plotly
 streamlit
-#shap
+shap
 scipy
 tqdm
 joblib

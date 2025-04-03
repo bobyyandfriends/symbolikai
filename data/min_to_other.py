@@ -1,26 +1,31 @@
 import os
 import pandas as pd
 
-# Automatically get the path of the current script
+"""
+min_to_other.py
+If you want to resample your minute data into different intervals (2min,5min,...),
+this script finds CSVs in polygon_minute_data/ and outputs them to polygon_2min_data, etc.
+We'll keep it as is, but ensure columns are [timestamp,open,high,low,close,volume].
+"""
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-INPUT_FOLDER = os.path.join(BASE_DIR, "polygon_minute_data")
+INPUT_FOLDER = os.path.join(BASE_DIR, "minute_data")  # instead of polygon_minute_data
 OUTPUT_INTERVALS = {
-    "2min": os.path.join(BASE_DIR, "polygon_2min_data"),
-    "5min": os.path.join(BASE_DIR, "polygon_5min_data"),
-    "10min": os.path.join(BASE_DIR, "polygon_10min_data"),
-    "15min": os.path.join(BASE_DIR, "polygon_15min_data"),
-    "30min": os.path.join(BASE_DIR, "polygon_30min_data"),
-    "60min": os.path.join(BASE_DIR, "polygon_60min_data"),
-    "90min": os.path.join(BASE_DIR, "polygon_90min_data"),
-    "120min": os.path.join(BASE_DIR, "polygon_120min_data"),
-    "180min": os.path.join(BASE_DIR, "polygon_180min_data"),
-    "240min": os.path.join(BASE_DIR, "polygon_240min_data"),
-    "D": os.path.join(BASE_DIR, "polygon_daily_data"),
-    "W": os.path.join(BASE_DIR, "polygon_weekly_data"),
+    "2min": os.path.join(BASE_DIR, "2min_data"),
+    "5min": os.path.join(BASE_DIR, "5min_data"),
+    "10min": os.path.join(BASE_DIR, "10min_data"),
+    "15min": os.path.join(BASE_DIR, "15min_data"),
+    "30min": os.path.join(BASE_DIR, "30min_data"),
+    "60min": os.path.join(BASE_DIR, "60min_data"),
+    "90min": os.path.join(BASE_DIR, "90min_data"),
+    "120min": os.path.join(BASE_DIR, "120min_data"),
+    "180min": os.path.join(BASE_DIR, "180min_data"),
+    "240min": os.path.join(BASE_DIR, "240min_data"),
+    "D": os.path.join(BASE_DIR, "daily_data"),
+    "W": os.path.join(BASE_DIR, "weekly_data"),
 }
 
 
-# Resampling dictionary
 ohlc_dict = {
     'open': 'first',
     'high': 'max',
@@ -29,23 +34,33 @@ ohlc_dict = {
     'volume': 'sum'
 }
 
-# Create output folders if they don’t exist
 for folder in OUTPUT_INTERVALS.values():
     os.makedirs(folder, exist_ok=True)
 
-# Process all CSV files in the input folder
 for filename in os.listdir(INPUT_FOLDER):
     if filename.endswith(".csv"):
         filepath = os.path.join(INPUT_FOLDER, filename)
-        df = pd.read_csv(filepath, parse_dates=['timestamp'])
+        df = pd.read_csv(filepath)
+        # parse date
+        if 'timestamp' in df.columns:
+            df['timestamp'] = pd.to_datetime(df['timestamp'], errors='coerce')
+        else:
+            print(f"[min_to_other] No 'timestamp' column in {filename}, skipping.")
+            continue
 
-        # Set timestamp as index
         df.set_index('timestamp', inplace=True)
 
         for freq, out_folder in OUTPUT_INTERVALS.items():
             resampled = df.resample(freq).apply(ohlc_dict).dropna()
             resampled.reset_index(inplace=True)
 
-            out_path = os.path.join(out_folder, filename)
+            # Strip extension and infer symbol name from filename
+            symbol = filename.split("_")[0]  # Gets 'AAPL' from 'AAPL_6mo_minute.csv'
+
+            # Define new filename using symbol and timeframe
+            new_filename = f"{symbol}_{freq}.csv"
+
+            out_path = os.path.join(out_folder, new_filename)
             resampled.to_csv(out_path, index=False)
-            print(f"Saved {freq} data to {out_path}")
+
+            print(f"[min_to_other] Saved {freq} data => {out_path}")

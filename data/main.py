@@ -1,61 +1,59 @@
 #!/usr/bin/env python3
 import os
 import pandas as pd
-from collect_minute_data import update_symbol_data
 from data_store import load_df_csv, save_df_csv
+
+"""
+This main.py can do:
+  1) merges all minute CSV files from data/minute/ into one big CSV
+  2) optionally read tradeable_universe.txt, call fetches (if you want),
+     or you can rely on the separate script in collect_minute_data.py
+"""
 
 def update_all_symbols(universe_file: str, data_dir: str):
     """
-    Read the tradeable universe file for symbols, update minute data for each symbol,
-    and combine all symbol CSV files into one master CSV file.
-    
-    Parameters:
-      universe_file: Path to a text file with one symbol per line.
-      data_dir: Directory where minute data CSVs are stored.
+    (Optional) For each symbol in universe_file, do the fetch routine 
+    (like collect_minute_data.py does). We'll skip it if we rely on separate script.
+    Then combine all data. This is an example approach:
     """
-    if not os.path.exists(universe_file):
-        print(f"Universe file not found: {universe_file}")
-        return
-    
+
+    # Example: we skip re-fetch because the 'collect_minute_data.py' is the main fetch script.
+    # We'll just combine them:
+
     with open(universe_file, "r") as f:
         symbols = [line.strip() for line in f if line.strip()]
-    
-    # Ensure the data directory exists
-    os.makedirs(data_dir, exist_ok=True)
-    
-    # Update data for each symbol
-    for symbol in symbols:
-        try:
-            update_symbol_data(symbol)
-        except Exception as e:
-            print(f"Error updating data for {symbol}: {e}")
-    
-    # Combine all symbol CSV files into a master CSV
+
     master_data = []
-    for symbol in symbols:
-        symbol_csv = os.path.join(data_dir, f"{symbol.upper()}.csv")
-        if os.path.exists(symbol_csv):
-            try:
-                df = load_df_csv(symbol_csv)
-                df["symbol"] = symbol.upper()
-                master_data.append(df)
-            except Exception as e:
-                print(f"Error loading data for {symbol} from {symbol_csv}: {e}")
-    
+    for sym in symbols:
+        fpath = os.path.join(data_dir, f"{sym.upper()}_6mo_minute.csv")
+        if os.path.exists(fpath):
+            df = load_df_csv(fpath)
+            if df.empty:
+                continue
+            # If you want the symbol column in master CSV, do:
+            df["symbol"] = sym.upper()
+            master_data.append(df)
+        else:
+            print(f"[main] No CSV found for {sym} at {fpath}")
+
     if master_data:
         combined_df = pd.concat(master_data, ignore_index=True)
-        combined_df.sort_values("datetime", inplace=True)
-        master_csv_path = os.path.join(data_dir, "master_minute_data.csv")
-        save_df_csv(combined_df, master_csv_path)
-        print(f"Master minute data saved to: {master_csv_path}")
+        combined_df.sort_values("timestamp", inplace=True)
+        out_file = os.path.join(data_dir, "master_minute_data.csv")
+        save_df_csv(combined_df, out_file)
+        print(f"[main] Master CSV saved => {out_file}")
     else:
-        print("No data available to combine.")
+        print("[main] No data to combine into master CSV.")
 
 def main():
-    # Path to tradeable universe file (assumed to be in the project root)
-    universe_file = os.path.join("..", "tradeable_universe.txt")
-    # Directory where minute data CSVs are stored (inside the data folder)
+    # usage example
+    universe_file = "tradeable_universe.txt"
     data_dir = os.path.join("data", "minute")
+    if not os.path.exists(universe_file):
+        print(f"[main] Universe file not found: {universe_file}")
+        return
+
+    # combine
     update_all_symbols(universe_file, data_dir)
 
 if __name__ == "__main__":

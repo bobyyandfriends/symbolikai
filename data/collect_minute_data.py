@@ -1,95 +1,123 @@
 #!/usr/bin/env python3
-import os
+"""
+collect_minute_data.py
+
+Pull minute-level OHLCV data from Polygon.io for each symbol listed in a text file
+(called "tradeable_universe.txt"). Data is fetched in chunks to avoid large calls, 
+and each final CSV is stored in data/minute/<SYMBOL>.csv with columns:
+  timestamp,open,high,low,close,volume
+No 'symbol' column is stored in each CSV.
+
+Key variables:
+  START_DAYS_AGO: e.g. 240 (8 months)
+  CHUNK_DAYS: how many days per chunk
+  SLEEP_BETWEEN_CALLS: seconds to sleep to respect rate limit
+"""
+
+import requests
 import pandas as pd
-import numpy as np
+import time
+import os
 from datetime import datetime, timedelta
-import requests  # For real API calls; currently not used in the simulation
 from data.data_store import save_df_csv, load_df_csv
 
-# === CONFIGURATION ===
-API_KEY = "YOUR_API_KEY_HERE"
-API_ENDPOINT = "https://api.example.com/minute_data"  # Replace with your real API endpoint
+# === CONFIG ===
+API_KEY = "axGISBpI_t8pxtKOTRB6mdmcovNLpZjx"  # Replace with your actual Polygon.io key
+SAVE_DIR = "minute_data"
+START_DAYS_AGO = 240        # e.g. ~8 months of data
+CHUNK_DAYS = 120            # 2 chunks of 120 days each
+SLEEP_BETWEEN_CALLS = 12    # seconds to respect 5 calls/min limit
 
-# Path to the tradeable universe list
-SYMBOL_LIST_FILE = os.path.join("..", "tradeable_universe.txt")
-
-# Directory to store minute data CSVs
-DATA_DIR = os.path.join("data", "minute")
-
-def fetch_minute_data(symbol: str, start_date: str, end_date: str) -> pd.DataFrame:
+def fetch_minute_data(ticker: str, start_date: str, end_date: str) -> pd.DataFrame:
     """
-    Fetch 1-minute OHLCV data from the API for the given symbol and date range.
-    This function currently simulates a response. Replace the simulation with your provider-specific API call.
+    Fetch 1-minute OHLCV data from Polygon's Aggregates API.
+    Endpoint: https://api.polygon.io/v2/aggs/ticker/{ticker}/range/1/minute/{start}/{end}
+
+    Returns a DataFrame with columns:
+      timestamp, open, high, low, close, volume
     """
+    url = f"https://api.polygon.io/v2/aggs/ticker/{ticker}/range/1/minute/{start_date}/{end_date}"
     params = {
-        "symbol": symbol,
-        "start": start_date,
-        "end": end_date,
-        "api_key": API_KEY,
+        "adjusted": "true",
+        "sort": "asc",
+        "limit": 50000,
+        "apiKey": API_KEY
     }
-    
-    # In production, you might use:
-    # response = requests.get(API_ENDPOINT, params=params)
-    # data = response.json()
-    # And then convert the response into a DataFrame.
-    print(f"Fetching data for {symbol} from {start_date} to {end_date}...")
-    
-    # Simulated data for demonstration purposes:
-    dt_range = pd.date_range(start=start_date, end=end_date, freq="1min")
-    data = {
-        "datetime": dt_range,
-        "symbol": symbol,
-        "open": 100 + np.random.rand(len(dt_range)),
-        "high": 100 + np.random.rand(len(dt_range)),
-        "low": 100 + np.random.rand(len(dt_range)),
-        "close": 100 + np.random.rand(len(dt_range)),
-        "volume": np.random.randint(100, 1000, size=len(dt_range))
-    }
-    df = pd.DataFrame(data)
+    print(f"[→] Fetching {ticker} from {start_date} to {end_date}")
+    response = requests.get(url, params=params)
+    if response.status_code != 200:
+        print(f"[!] Error for {ticker}: {response.status_code} {response.text}")
+        return pd.DataFrame()
+
+    data = response.json()
+    if 'results' not in data:
+        print(f"[!] No results for {ticker}")
+        return pd.DataFrame()
+
+    df = pd.DataFrame(data['results'])
+    # convert 't' to datetime
+    df['timestamp'] = pd.to_datetime(df['t'], unit='ms')
+    # rename columns
+    df = df.rename(columns={
+        'o': 'open', 'h': 'high', 'l': 'low', 'c': 'close', 'v': 'volume'
+    })
+    # keep only final columns
+    df = df[['timestamp','open','high','low','close','volume']]
     return df
 
-def update_symbol_data(symbol: str):
+def fetch_and_save_symbol(ticker: str):
     """
-    For a given symbol, fetch new minute data from the latest timestamp in the existing CSV (if any)
-    until now, and append the new data to the CSV.
+    For a single symbol, chunk the date range, fetch data, 
+    combine, deduplicate, and store in CSV:
+      data/minute/<TICKER>_6mo_minute.csv
     """
-    csv_path = os.path.join(DATA_DIR, f"{symbol.upper()}.csv")
-    
-    if os.path.exists(csv_path):
-        existing_df = load_df_csv(csv_path)
-        last_date = existing_df["datetime"].max()
-        # Start fetching from the next minute after the last recorded timestamp
-        start_date = (pd.to_datetime(last_date) + timedelta(minutes=1)).strftime("%Y-%m-%d %H:%M:%S")
-    else:
-        # If no existing data, fetch data from one week ago
-        start_date = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d %H:%M:%S")
-        existing_df = pd.DataFrame()
-    
-    end_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    new_data = fetch_minute_data(symbol, start_date, end_date)
-    
-    if not existing_df.empty:
-        combined_df = pd.concat([existing_df, new_data], ignore_index=True)
-    else:
-        combined_df = new_data
+    os.makedirs(SAVE_DIR, exist_ok=True)
 
-    # Remove duplicates and sort by datetime
-    combined_df = combined_df.drop_duplicates(subset=["datetime"]).sort_values("datetime")
-    save_df_csv(combined_df, csv_path)
-    print(f"Data updated for {symbol}.")
+    end_date = datetime.utcnow().date()
+    start_date = end_date - timedelta(days=START_DAYS_AGO)
+
+    symbol_df = pd.DataFrame()
+    # chunk-based approach
+    for i in range(0, START_DAYS_AGO, CHUNK_DAYS):
+        chunk_start = start_date + timedelta(days=i)
+        chunk_end = min(chunk_start + timedelta(days=CHUNK_DAYS), end_date)
+
+        df = fetch_minute_data(
+            ticker,
+            chunk_start.strftime('%Y-%m-%d'),
+            chunk_end.strftime('%Y-%m-%d')
+        )
+        if not df.empty:
+            symbol_df = pd.concat([symbol_df, df], ignore_index=True)
+
+        time.sleep(SLEEP_BETWEEN_CALLS)
+
+    if not symbol_df.empty:
+        # sort & deduplicate
+        symbol_df.drop_duplicates(subset=["timestamp"], inplace=True)
+        symbol_df.sort_values("timestamp", inplace=True)
+
+        file_path = os.path.join(SAVE_DIR, f"{ticker.upper()}_minute.csv")
+        save_df_csv(symbol_df, file_path)
+        print(f"[✓] Saved {ticker} data to {file_path}")
+    else:
+        print(f"[!] No data saved for {ticker}")
 
 def main():
-    # Read symbols from the tradeable universe file
-    with open(SYMBOL_LIST_FILE, "r") as f:
-        symbols = [line.strip() for line in f if line.strip()]
-    
-    os.makedirs(DATA_DIR, exist_ok=True)
-    
-    for symbol in symbols:
-        try:
-            update_symbol_data(symbol)
-        except Exception as e:
-            print(f"Error updating {symbol}: {e}")
+    """
+    1) read the text file for tickers
+    2) fetch & save each symbol's minute data
+    """
+    TICKER_LIST_FILE = "tradeable_universe.txt"  # or specify a path
+    if not os.path.exists(TICKER_LIST_FILE):
+        print(f"[!] Ticker list file not found: {TICKER_LIST_FILE}")
+        return
+
+    with open(TICKER_LIST_FILE, "r") as f:
+        tickers = [line.strip() for line in f if line.strip()]
+
+    for sym in tickers:
+        fetch_and_save_symbol(sym)
 
 if __name__ == "__main__":
     main()

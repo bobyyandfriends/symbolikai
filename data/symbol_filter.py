@@ -2,8 +2,8 @@
 
 def get_watchlist(name: str) -> list:
     """
-    Returns a list of symbols for a given watchlist name.
-    This stub can later be extended to load watchlists from a file or database.
+    Returns a list of symbols for the given watchlist name. 
+    Simple dictionary approach for demonstration.
     """
     watchlists = {
         "tech": ["AAPL", "MSFT", "GOOGL", "AMZN"],
@@ -14,24 +14,16 @@ def get_watchlist(name: str) -> list:
 
 def filter_symbols_by_activity(date: str, symbol_data: dict) -> list:
     """
-    Filters symbols based on activity on a given date.
-    'symbol_data' is a dictionary where keys are symbols and values are lists of date strings when activity occurred.
-    Returns a list of symbols that had activity on the specified date.
+    Return symbols that had 'date' in their activity list.
+    'symbol_data': { 'AAPL':['2025-03-01','2025-03-15'], ... }
     """
-    active_symbols = []
-    for symbol, dates in symbol_data.items():
+    active = []
+    for sym, dates in symbol_data.items():
         if date in dates:
-            active_symbols.append(symbol)
-    return active_symbols
+            active.append(sym)
+    return active
 
 if __name__ == "__main__":
-    tech_watchlist = get_watchlist("tech")
-    print("Tech Watchlist:", tech_watchlist)
-    
-    dummy_activity = {
-        "AAPL": ["2025-03-28", "2025-03-27"],
-        "MSFT": ["2025-03-26"],
-        "GOOGL": ["2025-03-28"]
-    }
-    active = filter_symbols_by_activity("2025-03-28", dummy_activity)
-    print("Active symbols on 2025-03-28:", active)
+    # example
+    w = get_watchlist("tech")
+    print("Tech watchlist:", w)
