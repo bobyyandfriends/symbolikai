@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-
 def get_watchlist(name: str) -> list:
     """
     Returns a list of symbols for the given watchlist name. 

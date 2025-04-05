@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+import os
+import sys
+
+# Dynamically add project root to sys.path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 def load_strategy(name: str):
     name = name.lower()

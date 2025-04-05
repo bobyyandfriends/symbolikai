@@ -5,6 +5,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 from datetime import datetime
 import pandas_ta as ta
+import os
+import sys
+
+# Dynamically add project root to sys.path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 
 # Import functions from our ML module
 from ml.model_training import generate_features, train_model

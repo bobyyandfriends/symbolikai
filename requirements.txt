@@ -11,3 +11,5 @@ shap
 scipy
 tqdm
 joblib
+PyYAML
+pytest

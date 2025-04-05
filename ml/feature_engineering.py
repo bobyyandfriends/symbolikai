@@ -93,7 +93,7 @@ def add_ta_features(df: pd.DataFrame,
 
 def merge_signals(price_df: pd.DataFrame,
                   signal_df: pd.DataFrame,
-                  on_col: str = "timestamp",
+                  on_col: str = "datetime",
                   how: str = "asof",
                   direction: str = "backward") -> pd.DataFrame:
     """
@@ -101,11 +101,11 @@ def merge_signals(price_df: pd.DataFrame,
     TA features. Typically we do an "asof merge" so each signal row is matched 
     to the nearest previous price row.
 
-    :param price_df: DataFrame with columns including the 'on_col' (usually 'timestamp') 
+    :param price_df: DataFrame with columns including the 'on_col' (usually 'datetime') 
                      plus TA features
     :param signal_df: DataFrame with the same time col (on_col) or different name (we can rename).
                       May contain synergy/pivot flags or external signals.
-    :param on_col: The column name to merge on (often 'timestamp' or 'datetime')
+    :param on_col: The column name to merge on (often 'datetime' or 'datetime')
     :param how: 'asof' or 'merge' or 'left' or 'right', etc. If we want the 
                 "most recent" approach, use asof with direction=backward/forward
     :param direction: for asof: 'backward','forward','nearest'
@@ -175,7 +175,7 @@ if __name__ == "__main__":
     dates = pd.date_range(start="2023-01-01", periods=50, freq='D')
     close_prices = 100 + np.cumsum(np.random.randn(50))
     df_price = pd.DataFrame({
-        'timestamp': dates,
+        'datetime': dates,
         'high': close_prices + 1.0,
         'low': close_prices - 1.0,
         'close': close_prices
@@ -191,7 +191,7 @@ if __name__ == "__main__":
 
     # 2) Suppose we have an external signal DataFrame
     signals = pd.DataFrame({
-        'timestamp': dates[::5],  # every 5th day
+        'datetime': dates[::5],  # every 5th day
         'demark_signal': np.random.randint(0,2, size=len(dates[::5])),
         'pivot_signal': np.random.randint(0,2, size=len(dates[::5]))
     })
@@ -205,5 +205,5 @@ if __name__ == "__main__":
     print("\nSignals with synergy:\n", signals_synergy.head())
 
     # 3) Merge signals with the TA-enhanced price data
-    merged = merge_signals(df_with_ta, signals_synergy, on_col="timestamp", how="asof", direction="backward")
+    merged = merge_signals(df_with_ta, signals_synergy, on_col="datetime", how="asof", direction="backward")
     print("\nMerged Data:\n", merged.head())

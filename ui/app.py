@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
 import streamlit as st
+import os
+import sys
+
+# Dynamically add project root to sys.path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 from ui.pages.strategy_tester import strategy_tester_page
 from ui.pages.signal_explorer import main as signal_explorer_page
 from ui.pages.model_trainer import main as model_trainer_page

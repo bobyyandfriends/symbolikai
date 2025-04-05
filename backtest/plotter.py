@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
+
+
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
+
 
 def plot_trades(price_data: pd.DataFrame, trades: pd.DataFrame):
     """

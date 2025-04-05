@@ -10,6 +10,7 @@ import pandas as pd
 import numpy as np
 import math
 
+
 def calculate_metrics(
     trades: pd.DataFrame, 
     initial_capital: float = 100_000.0,

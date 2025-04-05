@@ -103,7 +103,7 @@ if __name__ == "__main__":
         "trades": trades_a,
         "config": {"initial_capital": 100000},
         "metrics": metrics_a,
-        "timestamp": datetime.now()
+        "datetime": datetime.now()
     }
 
     # Dummy results for Strategy B
@@ -128,7 +128,7 @@ if __name__ == "__main__":
         "trades": trades_b,
         "config": {"initial_capital": 100000},
         "metrics": metrics_b,
-        "timestamp": datetime.now()
+        "datetime": datetime.now()
     }
 
     results_list = [result_a, result_b]

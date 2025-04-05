@@ -3,6 +3,12 @@ import pandas as pd
 import numpy as np
 import pytest
 from datetime import datetime
+import os
+import sys
+
+# Dynamically add project root to sys.path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 from strategies.simple_strategy import SimpleStrategy
 from strategies.demark_perfection_strategy import DemarkPerfectionStrategy
 from strategies.combo_strategy_example import ComboStrategyExample

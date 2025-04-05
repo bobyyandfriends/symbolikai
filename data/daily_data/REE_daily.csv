@@ -1,4 +1,4 @@
-timestamp,open,high,low,close,volume
+datetime,open,high,low,close,volume
 2024-08-01,3.94,3.94,3.75,3.8958,10673
 2024-08-02,3.76,3.88,3.7593,3.78,12674
 2024-08-05,3.54,3.78,3.16,3.395,83560

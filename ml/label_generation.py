@@ -23,81 +23,36 @@ import pandas as pd
 import numpy as np
 
 
-def generate_labels(
-    df: pd.DataFrame,
-    future_window: int = 10,
-    style: str = "binary",
-    upper_threshold: float = 0.03,
-    lower_threshold: float = -0.02,
-    add_regression_label: bool = True
-) -> pd.DataFrame:
+def generate_labels(df: pd.DataFrame,
+                    future_window: int = 5,
+                    profit_threshold: float = 0.02,
+                    loss_threshold: float = -0.01) -> pd.DataFrame:
     """
-    Generate labels based on future returns.
+    Generates a binary classification label column based on future returns.
 
-    Steps:
-      - We'll compute 'future_return' = (close.shift(-future_window) / close) - 1.0
-      - Depending on 'style':
-         * 'binary': label=1 if future_return >= upper_threshold, else 0 if future_return < upper_threshold 
-                     (or if you want to incorporate lower_threshold, see below).
-         * 'ternary': 
-              label=2 if future_return >= upper_threshold
-              label=1 if lower_threshold <= future_return < upper_threshold
-              label=0 if future_return < lower_threshold
-
-      - Optionally add 'future_return' as a column for potential regression tasks.
-
-    :param df: DataFrame that has at least 'close' column
-    :param future_window: how many bars to look ahead
-    :param style: "binary" or "ternary" or "custom"
-    :param upper_threshold: if future_return >= upper_threshold => bullish label
-    :param lower_threshold: if future_return <= lower_threshold => bearish or 0 label
-    :param add_regression_label: if True, keep 'future_return' for regression tasks
-    :return: a copy of DataFrame with 'future_return' and 'label' columns
+    Label = 1 if future return >= profit_threshold  
+    Label = 0 if future return <= loss_threshold  
+    Label = np.nan otherwise
     """
     df = df.copy()
-    if 'close' not in df.columns:
-        raise ValueError("DataFrame must have a 'close' column to compute future_return.")
 
-    # 1) compute future return
-    df["future_return"] = df["close"].shift(-future_window) / df["close"] - 1.0
+    # Ensure we have sorted data
+    df.sort_values("datetime", inplace=True)
 
-    # 2) define 'label' based on style
-    if style not in ["binary", "ternary", "custom"]:
-        raise ValueError("Unsupported style. Use 'binary', 'ternary', or 'custom'")
+    # Calculate future return
+    df["future_price"] = df["close"].shift(-future_window)
+    df["future_return"] = (df["future_price"] - df["close"]) / df["close"]
 
-    df["label"] = np.nan  # start with NaN
+    # Assign label
+    df["label"] = df["future_return"].apply(
+        lambda r: 1 if r >= profit_threshold else (0 if r <= loss_threshold else None)
+    )
 
-    if style == "binary":
-        # We'll do a simple approach:
-        # label=1 if future_return >= upper_threshold, else 0
-        # or you could incorporate a negative threshold => label=0 if future_return < 0 or < lower_threshold
-        df.loc[df["future_return"] >= upper_threshold, "label"] = 1
-        df.loc[df["future_return"] < upper_threshold, "label"] = 0
-
-    elif style == "ternary":
-        #  2 if future_return >= upper_threshold
-        #  1 if lower_threshold <= future_return < upper_threshold
-        #  0 if future_return < lower_threshold
-        df.loc[df["future_return"] >= upper_threshold, "label"] = 2
-        df.loc[(df["future_return"] < upper_threshold) &
-               (df["future_return"] >= lower_threshold), "label"] = 1
-        df.loc[df["future_return"] < lower_threshold, "label"] = 0
-
-    else:
-        # 'custom' => you can define your own labeling logic here or a callback
-        # We'll just replicate the old logic:
-        # label=1 if > upper_threshold, else 0 if < lower_threshold
-        # if future_return in between, we do 0 or 1?
-        # Let's replicate the old approach:
-        df.loc[df["future_return"] > upper_threshold, "label"] = 1
-        df.loc[df["future_return"] < lower_threshold, "label"] = 0
-        # if user wants a do-nothing in the middle, it remains NaN
-
-    # If add_regression_label is False, you might remove the 'future_return' column after labeling
-    if not add_regression_label:
-        df.drop(columns=["future_return"], inplace=True)
+    # Drop helper columns (optional)
+    df.drop(columns=["future_price", "future_return"], inplace=True)
 
     return df
+
 
 
 def filter_valid_labels(df: pd.DataFrame,

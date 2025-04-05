@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 import os
 import pandas as pd
+import sys
+
+# Dynamically add project root to sys.path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 from data_store import load_df_csv, save_df_csv
 
 """
@@ -38,7 +43,7 @@ def update_all_symbols(universe_file: str, data_dir: str):
 
     if master_data:
         combined_df = pd.concat(master_data, ignore_index=True)
-        combined_df.sort_values("timestamp", inplace=True)
+        combined_df.sort_values("datetime", inplace=True)
         out_file = os.path.join(data_dir, "master_minute_data.csv")
         save_df_csv(combined_df, out_file)
         print(f"[main] Master CSV saved => {out_file}")

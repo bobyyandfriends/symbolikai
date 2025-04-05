@@ -2,6 +2,12 @@
 import pytest
 import pandas as pd
 import numpy as np
+import os
+import sys
+
+# Dynamically add project root to sys.path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 from ml.model_training import generate_features, train_model
 from ml.label_generation import generate_labels, filter_valid_labels
 from ml.environment_classifier import EnvironmentClassifier

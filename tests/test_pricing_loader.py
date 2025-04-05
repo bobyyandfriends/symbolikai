@@ -1,8 +1,13 @@
 #!/usr/bin/env python3
 import pandas as pd
 import pytest
-from data.pricing_loader import load_price_data, get_price_path, resample_price_data
 import os
+import sys
+
+# Dynamically add project root to sys.path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+from data.pricing_loader import load_price_data, get_price_path, resample_price_data
 
 @pytest.fixture
 def dummy_price_csv(tmp_path):

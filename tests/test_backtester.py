@@ -1,10 +1,21 @@
 #!/usr/bin/env python3
+import sys
+import os
+
 import pytest
 import pandas as pd
 import numpy as np
 from datetime import datetime
+import sys
+
+# Dynamically add project root to sys.path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 from backtest.backtester import run_backtest
 from strategies.simple_strategy import SimpleStrategy
+
+
+
 
 @pytest.fixture
 def dummy_price_data():
@@ -47,7 +58,7 @@ def test_run_backtest(dummy_price_data, dummy_strategy, dummy_signals):
     results = run_backtest(dummy_strategy, dummy_price_data, dummy_signals, config)
     
     # Check that results is a dictionary with expected keys.
-    expected_keys = {"trades", "metrics", "config", "strategy_name", "timestamp"}
+    expected_keys = {"trades", "metrics", "config", "strategy_name", "datetime"}
     assert expected_keys.issubset(results.keys())
     
     # Check that trades is a DataFrame with expected columns, if not empty.

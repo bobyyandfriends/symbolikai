@@ -2,6 +2,12 @@
 import pandas as pd
 import io
 import pytest
+import os
+import sys
+
+# Dynamically add project root to sys.path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 from data.signal_loader import load_signals_from_file, normalize_signals, deduplicate_signals
 
 def dummy_csv_data():

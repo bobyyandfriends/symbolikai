@@ -19,6 +19,8 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 
+
+
 def calculate_metrics(trades: pd.DataFrame,
                       initial_capital: float = 100_000.0) -> dict:
     """
@@ -154,7 +156,7 @@ def run_backtest(strategy,
         - synergy_enabled (bool)
         - commentary (bool)
         - etc...
-    :return: dictionary with 'trades', 'metrics', 'config', 'timestamp', ...
+    :return: dictionary with 'trades', 'metrics', 'config', 'datetime', ...
     """
     # 1) Generate raw trades from the strategy
     raw_trades = strategy.generate_trades(price_data, signals)
@@ -165,7 +167,7 @@ def run_backtest(strategy,
             "metrics": {},
             "config": config,
             "strategy_name": getattr(strategy, 'name', 'Unknown'),
-            "timestamp": datetime.now()
+            "datetime": datetime.now()
         }
 
     # Ensure we have columns for synergy + commentary
@@ -262,6 +264,6 @@ def run_backtest(strategy,
         "metrics": stats,
         "config": config,
         "strategy_name": getattr(strategy, 'name', 'Unknown'),
-        "timestamp": datetime.now()
+        "datetime": datetime.now()
     }
     return result

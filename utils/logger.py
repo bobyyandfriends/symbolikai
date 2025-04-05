@@ -1,6 +1,12 @@
 #!/usr/bin/env python3
 import logging
 import os
+import os
+import sys
+
+# Dynamically add project root to sys.path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 
 def setup_logger(name: str = __name__, log_file: str = "app.log", level=logging.INFO) -> logging.Logger:
     """

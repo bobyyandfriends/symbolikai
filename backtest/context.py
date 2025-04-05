@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
+
 import pandas as pd
 from datetime import datetime
+
+
 
 
 class BacktestContext:
@@ -43,7 +46,7 @@ class BacktestContext:
         self.initial_capital = initial_capital
         self.cash = initial_capital
 
-        # equity_curve can store (timestamp, equity) or (index, equity).
+        # equity_curve can store (datetime, equity) or (index, equity).
         # We'll store as list of dict for flexibility
         self.equity_curve = []
         self.active_positions = []  # List of dict objects for open trades

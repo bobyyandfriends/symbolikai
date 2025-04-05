@@ -1,6 +1,12 @@
 #!/usr/bin/env python3
 import argparse
 import sys
+import os
+import sys
+
+# Dynamically add project root to sys.path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 from utils.config_loader import load_config
 from data.pricing_loader import load_price_data
 from data.signal_loader import load_signals_from_file, normalize_signals

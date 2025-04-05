@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
+
 from datetime import datetime
+
 
 class Trade:
     """
@@ -32,86 +34,76 @@ class Trade:
     """
 
     def __init__(self,
-                 entry_time: datetime,
-                 entry_price: float,
-                 side: str = "long",
-                 quantity: float = 1.0,
-                 synergy_score: float = 0.0,
+                 entry_time,
+                 entry_price,
+                 side,
+                 capital=10000,
+                 quantity=1.0,
+                 stop_loss=None,
+                 profit_target=None,
+                 slippage_pct=0.0,
+                 commission=0.0,
+                 synergy_score=0.0,
                  reason_codes=None,
-                 commentary: str = "",
-                 kelly_fraction: float = None,
-                 slippage: float = 0.0,
-                 commission: float = 0.0):
+                 commentary="",
+                 kelly_fraction=None,
+                 **kwargs):
         self.entry_time = entry_time
         self.entry_price = entry_price
-        self.side = side.lower()  # 'long' or 'short'
+        self.side = side.lower()
+        self.capital = capital
         self.quantity = quantity
-
-        self.synergy_score = synergy_score
-        self.reason_codes = reason_codes if reason_codes else ""
-        self.commentary = commentary
-
-        self.kelly_fraction = kelly_fraction
-        self.slippage = slippage
+        self.stop_loss = stop_loss
+        self.profit_target = profit_target
+        self.slippage_pct = slippage_pct
+        self.slippage = entry_price * slippage_pct if slippage_pct > 0 else 0.0
         self.commission = commission
+        self.synergy_score = synergy_score
+        self.reason_codes = reason_codes if reason_codes is not None else ""
+        self.commentary = commentary
+        self.kelly_fraction = kelly_fraction
 
-        # exit fields
         self.exit_time = None
         self.exit_price = None
         self.realized_pnl = None
-
         self.closed = False
+
+        # Allow custom kwargs for extensibility
+        for k, v in kwargs.items():
+            setattr(self, k, v)
 
     def close_trade(self, exit_time: datetime, exit_price: float):
         """
         Close the trade with the specified exit time and price.
-        Realized PnL is computed at closure, factoring in side, slippage, commission, etc.
+        Realized PnL is computed at closure.
         """
         if self.closed:
-            # if the trade is already closed, skip or raise an error
             return
 
         self.exit_time = exit_time
         self.exit_price = exit_price
         self.closed = True
 
-        # naive PnL calc ignoring partial closes
-        raw_pnl = 0.0
         if self.side == "long":
-            raw_pnl = (self.exit_price - self.entry_price) * self.quantity
-        else:  # short
-            raw_pnl = (self.entry_price - self.exit_price) * self.quantity
+            raw_pnl = (exit_price - self.entry_price) * self.quantity
+        else:
+            raw_pnl = (self.entry_price - exit_price) * self.quantity
 
-        # account for slippage + commission
-        total_cost = (self.slippage + self.commission)
-        self.realized_pnl = raw_pnl - total_cost
+        self.realized_pnl = raw_pnl - (self.slippage + self.commission)
 
     def calculate_pnl(self, current_price: float = None) -> float:
-        """
-        Calculate open PnL if the trade is not yet closed, or return realized_pnl if closed.
-        If current_price is provided for an open trade, we mark to market.
-        """
         if self.closed:
             return self.realized_pnl if self.realized_pnl is not None else 0.0
 
         if current_price is None:
-            # if no price, can't do open pnl
             return 0.0
 
         if self.side == "long":
-            open_pnl = (current_price - self.entry_price) * self.quantity
+            return (current_price - self.entry_price) * self.quantity
         else:
-            open_pnl = (self.entry_price - current_price) * self.quantity
-
-        # we usually don't subtract slippage/commission from open PnL,
-        # but if your approach does, handle that here.
-        return open_pnl
+            return (self.entry_price - current_price) * self.quantity
 
     def to_dict(self) -> dict:
-        """
-        Return a dictionary representation of this trade's attributes.
-        This is handy for logging or converting to a DataFrame.
-        """
         return {
             "entry_time": self.entry_time,
             "entry_price": self.entry_price,
@@ -123,18 +115,18 @@ class Trade:
             "reason_codes": self.reason_codes,
             "commentary": self.commentary,
             "slippage": self.slippage,
+            "slippage_pct": self.slippage_pct,
             "commission": self.commission,
             "kelly_fraction": self.kelly_fraction,
             "realized_pnl": self.realized_pnl,
-            "closed": self.closed
+            "closed": self.closed,
         }
 
 
+# Example usage
 if __name__ == "__main__":
-    # Example usage:
-    from datetime import datetime, timedelta
+    from datetime import timedelta
 
-    # Create a new trade
     my_trade = Trade(
         entry_time=datetime(2023, 1, 1, 9, 30),
         entry_price=100.0,
@@ -144,22 +136,16 @@ if __name__ == "__main__":
         reason_codes="Pivot+DeMark",
         commentary="Triggered by synergy alignment",
         kelly_fraction=0.15,
-        slippage=2.0,
+        slippage_pct=0.02,
         commission=1.0
     )
 
-    # Check open PnL with a hypothetical current price of 103
-    open_pnl = my_trade.calculate_pnl(current_price=103.0)
-    print(f"Open PnL: {open_pnl:.2f}")
+    print("Open PnL:", my_trade.calculate_pnl(103.0))
 
-    # Close the trade
     my_trade.close_trade(
-        exit_time=datetime(2023, 1, 1, 16, 0), 
+        exit_time=datetime(2023, 1, 1, 16, 0),
         exit_price=105.0
     )
-    # Realized PnL factoring slippage & commission
-    print(f"Realized PnL: {my_trade.realized_pnl:.2f}")
 
-    # Dump to dictionary
-    trade_dict = my_trade.to_dict()
-    print(trade_dict)
+    print("Realized PnL:", my_trade.realized_pnl)
+    print("Trade Dictionary:", my_trade.to_dict())

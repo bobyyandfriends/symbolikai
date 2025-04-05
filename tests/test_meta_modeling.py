@@ -2,11 +2,16 @@
 import pytest
 import pandas as pd
 import numpy as np
+import os
+import sys
+
+# Dynamically add project root to sys.path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 from ml.meta_modeling import MetaModel
 from sklearn.datasets import make_classification
 from sklearn.linear_model import LogisticRegression
 from sklearn.tree import DecisionTreeClassifier
-import os
 
 @pytest.fixture
 def dummy_classification_data():

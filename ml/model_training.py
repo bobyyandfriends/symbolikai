@@ -32,57 +32,109 @@ from sklearn.preprocessing import StandardScaler
 # 1) Feature Generation
 ###########################
 
-def generate_features(price_data: pd.DataFrame,
-                      signal_data: pd.DataFrame = None,
-                      synergy_map: dict = None,
-                      label_col: str = "target",
-                      dropna: bool = True) -> pd.DataFrame:
-    """
-    Generate features from price data and optional signals. 
-    This replicates or extends your logic with:
-      - Merging price_data with signal_data using an asof or normal merge
-      - Building synergy score if synergy_map is provided
-      - Possibly adding user-defined label if it already exists in price_data 
-        or if you want to do a separate label generation pipeline
+# def generate_features(price_data: pd.DataFrame,
+#                       signal_data: pd.DataFrame = None,
+#                       synergy_map: dict = None,
+#                       label_col: str = "target",
+#                       dropna: bool = True) -> pd.DataFrame:
+#     """
+#     Generate features from price data and optional signals. 
+#     This replicates or extends your logic with:
+#       - Merging price_data with signal_data using an asof or normal merge
+#       - Building synergy score if synergy_map is provided
+#       - Possibly adding user-defined label if it already exists in price_data 
+#         or if you want to do a separate label generation pipeline
 
-    :param price_data: DataFrame with columns used as features (like rsi, momentum, etc.)
-    :param signal_data: optional DataFrame with columns like demark_signal, pivot_signal
-    :param synergy_map: optional dict e.g. {"demark_signal":1.0, "pivot_signal":1.5} to build synergy_score
-    :param label_col: if your data already has a 'target' or label column. If not found, no label is included
-    :param dropna: if True, drop rows with any NaN. If you prefer partial cleaning, adjust logic
-    :return: DataFrame with features + optional label column
-    """
-    df_feat = price_data.copy()
+#     :param price_data: DataFrame with columns used as features (like rsi, momentum, etc.)
+#     :param signal_data: optional DataFrame with columns like demark_signal, pivot_signal
+#     :param synergy_map: optional dict e.g. {"demark_signal":1.0, "pivot_signal":1.5} to build synergy_score
+#     :param label_col: if your data already has a 'target' or label column. If not found, no label is included
+#     :param dropna: if True, drop rows with any NaN. If you prefer partial cleaning, adjust logic
+#     :return: DataFrame with features + optional label column
+#     """
+#     df_feat = price_data.copy()
 
-    # Merge signals if provided
-    if signal_data is not None and not signal_data.empty:
-        df_feat = pd.merge_asof(
-            df_feat.sort_values("datetime"),
-            signal_data.sort_values("datetime"),
-            on="datetime",
-            direction="backward"
-        )
+#     # Merge signals if provided
+#     if signal_data is not None and not signal_data.empty:
+#         df_feat = pd.merge_asof(
+#             df_feat.sort_values("datetime"),
+#             signal_data.sort_values("datetime"),
+#             on="datetime",
+#             direction="backward"
+#         )
 
-    # synergy_map => sum weighted columns
-    if synergy_map is not None:
-        synergy_score = np.zeros(len(df_feat))
+#     # synergy_map => sum weighted columns
+#     if synergy_map is not None:
+#         synergy_score = np.zeros(len(df_feat))
+#         for col, weight in synergy_map.items():
+#             if col in df_feat.columns:
+#                 synergy_score += df_feat[col].astype(float) * weight
+#         df_feat["synergy_score"] = synergy_score
+
+#     # If we want to ensure we have the label column. Some pipelines might do a separate label gen step.
+#     # We'll keep label if it exists
+#     if label_col not in df_feat.columns:
+#         print(f"[generate_features] Warning: '{label_col}' not found in DataFrame columns.")
+#     else:
+#         print(f"[generate_features] Found label column '{label_col}' in data.")
+
+#     # Drop NaN
+#     if dropna:
+#         df_feat = df_feat.dropna().reset_index(drop=True)
+
+#     return df_feat
+def generate_features(price_df: pd.DataFrame, signal_df: pd.DataFrame = None, synergy_map: dict = None) -> pd.DataFrame:
+
+    df = price_df.copy()
+
+    # Basic features
+    # Correct RSI calculation
+    delta = df['close'].diff()
+    gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+    rs = gain / loss
+    df['rsi'] = 100 - (100 / (1 + rs))
+
+    df['sma'] = df['close'].rolling(window=20).mean()
+    df['momentum'] = df['close'] - df['close'].shift(5)
+
+    # Add signals if provided
+    if signal_df is not None and 'datetime' in signal_df.columns:
+        df = df.merge(signal_df, on='datetime', how='left')
+        if 'signal' in df.columns:
+            df['signal_binary'] = df['signal'].map({'buy': 1, 'sell': 0}).fillna(0)
+
+
+    # Target label — future price up/down
+    if 'close' in df.columns:
+        df['future_close'] = df['close'].shift(-5)
+        df['target'] = (df['future_close'] > df['close']).astype(int)
+        df.drop(columns=['future_close'], inplace=True)
+        df.dropna(subset=['target'], inplace=True)
+
+
+    # Synergy score from weighted signal columns (if synergy_map is provided)
+    if signal_df is not None and synergy_map is not None:
+        synergy_score = np.zeros(len(df))
         for col, weight in synergy_map.items():
-            if col in df_feat.columns:
-                synergy_score += df_feat[col].astype(float) * weight
-        df_feat["synergy_score"] = synergy_score
+            if col in df.columns:
+                synergy_score += df[col].astype(float) * weight
+            else:
+                print(f"[generate_features] Warning: column '{col}' not found in signals for synergy.")
+        df["synergy_score"] = synergy_score
 
-    # If we want to ensure we have the label column. Some pipelines might do a separate label gen step.
-    # We'll keep label if it exists
-    if label_col not in df_feat.columns:
-        print(f"[generate_features] Warning: '{label_col}' not found in DataFrame columns.")
-    else:
-        print(f"[generate_features] Found label column '{label_col}' in data.")
 
-    # Drop NaN
-    if dropna:
-        df_feat = df_feat.dropna().reset_index(drop=True)
+    # Drop rows with any NaNs — can be changed to more selective cleaning if needed
+    df = df.dropna().reset_index(drop=True)
 
-    return df_feat
+    # Confirm 'target' exists after generation
+    if "target" not in df.columns:
+        raise ValueError("[generate_features] 'target' column was not generated.")
+
+
+    return df
+
+
 
 
 ###########################
@@ -113,7 +165,9 @@ def train_model(features_df: pd.DataFrame,
         raise ValueError(f"[train_model] Label column '{label_col}' not found in features DataFrame.")
 
     X = features_df.drop(columns=[label_col])
+    X = X.select_dtypes(include=[np.number])  # Only keep numeric features
     y = features_df[label_col]
+
 
     # 2) Model selection
     if task == "classification":
@@ -132,40 +186,18 @@ def train_model(features_df: pd.DataFrame,
         raise ValueError(f"Unsupported task type: {task}. Use 'classification' or 'regression'.")
 
     # 3) Optionally do param search
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=random_state)
+    # 4) Train/test split and training
+
     if do_hyperparam_search:
-        if param_grid is None:
-            # fallback param_grid
-            if model_type in ["rf", "rfr"]:
-                param_grid = {
-                    "n_estimators": [50, 100],
-                    "max_depth": [None, 5, 10]
-                }
-            elif model_type == "lr":
-                param_grid = {
-                    "C": [0.01, 0.1, 1.0, 10],
-                    "solver": ["lbfgs"]
-                }
-        from sklearn.model_selection import GridSearchCV
-        search = GridSearchCV(model, param_grid, cv=3, scoring="accuracy" if task=="classification" else "neg_mean_squared_error")
-        search.fit(X, y)
+        search = GridSearchCV(model, param_grid, cv=3,
+                          scoring="accuracy" if task == "classification" else "neg_mean_squared_error")
+        search.fit(X_train, y_train)
         model = search.best_estimator_
         print(f"[train_model] Best params from search: {search.best_params_}")
     else:
-        # just fit
-        model.fit(X, y)
+        model.fit(X_train, y_train)
 
-    # 4) Evaluate quickly on a hold-out set if desired
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=random_state)
-    model.fit(X_train, y_train)
-    if task == "classification":
-        preds = model.predict(X_test)
-        acc = (preds == y_test).mean()
-        print(f"[train_model] Quick classification accuracy: {acc:.4f}")
-    else:
-        # regression
-        preds = model.predict(X_test)
-        mse = ((preds - y_test) ** 2).mean()
-        print(f"[train_model] Quick regression MSE: {mse:.4f}")
 
     return model
 

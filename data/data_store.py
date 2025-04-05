@@ -2,6 +2,7 @@
 import pandas as pd
 import os
 
+
 def save_df_csv(df: pd.DataFrame, path: str):
     """
     Save a DataFrame to a CSV file, overwriting any existing file.
@@ -10,14 +11,14 @@ def save_df_csv(df: pd.DataFrame, path: str):
 
 def load_df_csv(path: str) -> pd.DataFrame:
     """
-    Load a DataFrame from a CSV file, parsing 'timestamp' as a date if present.
-    By default parse_dates is True for all columns? We'll specifically parse 'timestamp'.
+    Load a DataFrame from a CSV file, parsing 'datetime' as a date if present.
+    By default parse_dates is True for all columns? We'll specifically parse 'datetime'.
     """
-    # If 'timestamp' might not exist, you can handle it. But let's assume it does.
+    # If 'datetime' might not exist, you can handle it. But let's assume it does.
     # We'll do something like:
     df = pd.read_csv(path)
-    if 'timestamp' in df.columns:
-        df['timestamp'] = pd.to_datetime(df['timestamp'], errors='coerce')
+    if 'datetime' in df.columns:
+        df['datetime'] = pd.to_datetime(df['datetime'], errors='coerce')
     return df
 
 def save_df_pickle(df: pd.DataFrame, path: str):
@@ -42,7 +43,7 @@ if __name__ == "__main__":
     import datetime
 
     df_example = pd.DataFrame({
-        'timestamp': pd.date_range("2024-08-01 08:00:00", periods=5, freq='T'),
+        'datetime': pd.date_range("2024-08-01 08:00:00", periods=5, freq='T'),
         'open': np.random.rand(5) + 223,
         'high': np.random.rand(5) + 224,
         'low': np.random.rand(5) + 222,

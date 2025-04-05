@@ -1,11 +1,16 @@
 import os
 import pandas as pd
+import sys
+
+# Dynamically add project root to sys.path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 
 """
 min_to_other.py
 If you want to resample your minute data into different intervals (2min,5min,...),
 this script finds CSVs in polygon_minute_data/ and outputs them to polygon_2min_data, etc.
-We'll keep it as is, but ensure columns are [timestamp,open,high,low,close,volume].
+We'll keep it as is, but ensure columns are [datetime,open,high,low,close,volume].
 """
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -42,13 +47,13 @@ for filename in os.listdir(INPUT_FOLDER):
         filepath = os.path.join(INPUT_FOLDER, filename)
         df = pd.read_csv(filepath)
         # parse date
-        if 'timestamp' in df.columns:
-            df['timestamp'] = pd.to_datetime(df['timestamp'], errors='coerce')
+        if 'datetime' in df.columns:
+            df['datetime'] = pd.to_datetime(df['datetime'], errors='coerce')
         else:
-            print(f"[min_to_other] No 'timestamp' column in {filename}, skipping.")
+            print(f"[min_to_other] No 'datetime' column in {filename}, skipping.")
             continue
 
-        df.set_index('timestamp', inplace=True)
+        df.set_index('datetime', inplace=True)
 
         for freq, out_folder in OUTPUT_INTERVALS.items():
             resampled = df.resample(freq).apply(ohlc_dict).dropna()

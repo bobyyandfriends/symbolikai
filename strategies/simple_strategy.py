@@ -1,6 +1,12 @@
 #!/usr/bin/env python3
 import pandas as pd
 import numpy as np
+import os
+import sys
+
+# Dynamically add project root to sys.path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 from strategies.base_strategy import BaseStrategy
 
 class SimpleStrategy(BaseStrategy):
@@ -17,7 +23,7 @@ class SimpleStrategy(BaseStrategy):
         self.rsi_sell_threshold = rsi_sell_threshold
 
     def apply_indicators(self, price_data: pd.DataFrame) -> pd.DataFrame:
-        df = price_data.copy().sort_values('timestamp').reset_index(drop=True)
+        df = price_data.copy().sort_values('datetime').reset_index(drop=True)
         delta = df['close'].diff()
         gain = delta.clip(lower=0)
         loss = -delta.clip(upper=0)
@@ -42,29 +48,29 @@ class SimpleStrategy(BaseStrategy):
         sell_condition = (df['rsi'] > self.rsi_sell_threshold) & (df['close'] < df['sma'])
         df.loc[sell_condition, 'signal'] = 'sell'
 
-        signals = df[['timestamp', 'signal']].dropna().reset_index(drop=True)
+        signals = df[['datetime', 'signal']].dropna().reset_index(drop=True)
         return signals
 
     def generate_trades(self, price_data: pd.DataFrame, signals: pd.DataFrame) -> pd.DataFrame:
-        price_df = price_data.sort_values('timestamp').reset_index(drop=True)
-        signals = signals.sort_values('timestamp').reset_index(drop=True)
+        price_df = price_data.sort_values('datetime').reset_index(drop=True)
+        signals = signals.sort_values('datetime').reset_index(drop=True)
         trades = []
         in_position = False
         entry_time, entry_price = None, None
 
         for idx, row in signals.iterrows():
-            signal_time = row['timestamp']
+            signal_time = row['datetime']
             signal_type = row['signal']
             # Get the nearest price data at or after the signal time
-            current_row = price_df[price_df['timestamp'] >= signal_time].iloc[0]
+            current_row = price_df[price_df['datetime'] >= signal_time].iloc[0]
             current_price = current_row['close']
 
             if signal_type == 'buy' and not in_position:
                 in_position = True
-                entry_time = current_row['timestamp']
+                entry_time = current_row['datetime']
                 entry_price = current_price
             elif signal_type == 'sell' and in_position:
-                exit_time = current_row['timestamp']
+                exit_time = current_row['datetime']
                 exit_price = current_price
                 profit = exit_price - entry_price  # For long positions
                 trades.append({
@@ -83,7 +89,7 @@ class SimpleStrategy(BaseStrategy):
             trades.append({
                 'entry_time': entry_time,
                 'entry_price': entry_price,
-                'exit_time': last_row['timestamp'],
+                'exit_time': last_row['datetime'],
                 'exit_price': last_row['close'],
                 'profit': last_row['close'] - entry_price
             })
@@ -97,7 +103,7 @@ if __name__ == "__main__":
     prices = np.cumsum(np.random.randn(100)) + 100
     volume = np.random.randint(100, 1000, size=100)
     price_data = pd.DataFrame({
-        'timestamp': dates,
+        'datetime': dates,
         'open': prices + np.random.randn(100)*0.5,
         'high': prices + np.random.rand(100),
         'low': prices - np.random.rand(100),

@@ -1,7 +1,13 @@
 #!/usr/bin/env python3
 import pandas as pd
 import numpy as np
-from base_strategy import BaseStrategy
+import os
+import sys
+
+# Dynamically add project root to sys.path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+from strategies.base_strategy import BaseStrategy
 
 class ComboStrategyExample(BaseStrategy):
     """

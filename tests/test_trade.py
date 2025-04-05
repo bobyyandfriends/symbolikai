@@ -2,6 +2,12 @@
 import pytest
 import pandas as pd
 from datetime import datetime, timedelta
+import os
+import sys
+
+# Dynamically add project root to sys.path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 from backtest.trade import Trade
 
 def test_long_trade_pnl():

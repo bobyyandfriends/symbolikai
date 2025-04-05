@@ -5,7 +5,7 @@ collect_minute_data.py
 Pull minute-level OHLCV data from Polygon.io for each symbol listed in a text file
 (called "tradeable_universe.txt"). Data is fetched in chunks to avoid large calls, 
 and each final CSV is stored in data/minute/<SYMBOL>.csv with columns:
-  timestamp,open,high,low,close,volume
+  datetime,open,high,low,close,volume
 No 'symbol' column is stored in each CSV.
 
 Key variables:
@@ -18,6 +18,11 @@ import requests
 import pandas as pd
 import time
 import os
+import sys
+
+# Dynamically add project root to sys.path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 from datetime import datetime, timedelta
 from data.data_store import save_df_csv, load_df_csv
 
@@ -34,7 +39,7 @@ def fetch_minute_data(ticker: str, start_date: str, end_date: str) -> pd.DataFra
     Endpoint: https://api.polygon.io/v2/aggs/ticker/{ticker}/range/1/minute/{start}/{end}
 
     Returns a DataFrame with columns:
-      timestamp, open, high, low, close, volume
+      datetime, open, high, low, close, volume
     """
     url = f"https://api.polygon.io/v2/aggs/ticker/{ticker}/range/1/minute/{start_date}/{end_date}"
     params = {
@@ -56,13 +61,13 @@ def fetch_minute_data(ticker: str, start_date: str, end_date: str) -> pd.DataFra
 
     df = pd.DataFrame(data['results'])
     # convert 't' to datetime
-    df['timestamp'] = pd.to_datetime(df['t'], unit='ms')
+    df['datetime'] = pd.to_datetime(df['t'], unit='ms')
     # rename columns
     df = df.rename(columns={
         'o': 'open', 'h': 'high', 'l': 'low', 'c': 'close', 'v': 'volume'
     })
     # keep only final columns
-    df = df[['timestamp','open','high','low','close','volume']]
+    df = df[['datetime','open','high','low','close','volume']]
     return df
 
 def fetch_and_save_symbol(ticker: str):
@@ -94,8 +99,9 @@ def fetch_and_save_symbol(ticker: str):
 
     if not symbol_df.empty:
         # sort & deduplicate
-        symbol_df.drop_duplicates(subset=["timestamp"], inplace=True)
-        symbol_df.sort_values("timestamp", inplace=True)
+        symbol_df.drop_duplicates(subset=["datetime"], inplace=True)
+        symbol_df.sort_values("datetime", inplace=True)
+
 
         file_path = os.path.join(SAVE_DIR, f"{ticker.upper()}_minute.csv")
         save_df_csv(symbol_df, file_path)

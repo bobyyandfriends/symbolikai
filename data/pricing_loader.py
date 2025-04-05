@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 import os
 import pandas as pd
+import sys
+
+# Dynamically add project root to sys.path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 
 def get_price_path(symbol: str, timeframe: str) -> str:
     """
@@ -18,28 +23,35 @@ def get_price_path(symbol: str, timeframe: str) -> str:
 
 def load_price_data(symbol: str, timeframe: str = 'daily') -> pd.DataFrame:
     """
-    Load OHLCV from a CSV with columns 'timestamp','open','high','low','close','volume'.
-    Parse 'timestamp' as datetime, sort it, and return.
+    Load OHLCV from a CSV with columns 'datetime','open','high','low','close','volume'.
+    Parse 'datetime' as datetime, sort it, and return.
     """
     fpath = get_price_path(symbol, timeframe)
     if not os.path.exists(fpath):
         raise FileNotFoundError(f"[pricing_loader] Not found: {fpath}")
 
     df = pd.read_csv(fpath)
-    if 'timestamp' in df.columns:
-        df['timestamp'] = pd.to_datetime(df['timestamp'], errors='coerce')
-    df.dropna(subset=['timestamp'], inplace=True)
-    df.sort_values('timestamp', inplace=True)
+    # Normalize to use 'datetime' column regardless of original column name
+    if 'datetime' not in df.columns and 'datetime' in df.columns:
+        df.rename(columns={'datetime': 'datetime'}, inplace=True)
+
+    if 'datetime' not in df.columns:
+        raise ValueError("[load_price_data] Neither 'datetime' nor 'datetime' column found.")
+
+    df['datetime'] = pd.to_datetime(df['datetime'], errors='coerce')
+
+    df.dropna(subset=['datetime'], inplace=True)
+    df.sort_values('datetime', inplace=True)
     df.reset_index(drop=True, inplace=True)
     return df
 
 def resample_price_data(df: pd.DataFrame, new_timeframe: str) -> pd.DataFrame:
     """
-    Resample data to a new timeframe. 'timestamp' => index, then apply typical OHLC aggregator.
+    Resample data to a new timeframe. 'datetime' => index, then apply typical OHLC aggregator.
     e.g. new_timeframe = 'D' or '240min', etc.
     """
     df = df.copy()
-    df.set_index('timestamp', inplace=True)
+    df.set_index('datetime', inplace=True)
     ohlc_dict = {
         'open': 'first',
         'high': 'max',

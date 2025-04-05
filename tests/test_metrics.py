@@ -2,6 +2,12 @@
 import pytest
 import pandas as pd
 from datetime import datetime
+import os
+import sys
+
+# Dynamically add project root to sys.path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 from backtest.metrics import calculate_metrics
 
 def dummy_trades():
